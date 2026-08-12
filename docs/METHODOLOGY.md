@@ -86,6 +86,8 @@ where:
 
 Ridge regularization improves numerical stability when hedge instruments are collinear or when the hedge universe poorly spans the portfolio risk.
 
+The handwritten hedge derivation is included as a proof-of-work artifact: [pca-hedge-derivation.pdf](proof-of-work/pca-hedge-derivation.pdf).
+
 ## 7. Hedge Suitability Diagnostics
 
 The app reports diagnostics to prevent blind interpretation of hedge outputs:

@@ -1,0 +1,38 @@
+# Secrets and local config
+.streamlit/secrets.toml
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# OS/editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Streamlit/runtime artifacts
+.streamlit/cache/
+
+# Data and user uploads
+data/
+uploads/
+*.csv
+*.xlsx
+*.xls
+
+# Keep downloaded templates out of git unless intentionally added later.
+ratesfactor_*_template.csv
+ratesfactor_*_template.xlsx

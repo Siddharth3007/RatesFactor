@@ -21,6 +21,21 @@ where:
 - `h` is the hedge weight vector.
 - `lambda` controls ridge regularization.
 
+### Prototype Notebooks
+
+Folder: [prototype-notebooks](proof-of-work/prototype-notebooks)
+
+These notebooks are archived development artifacts from the exploratory phase of the project. They show how the Treasury curve analytics, scenario analysis, PCA hedging, historical VaR, parametric VaR, TLT/standard holdings ingestion, and spline diagnostics evolved before being refactored into the maintained package under `ratesfactor/` and the Streamlit app.
+
+Included notebooks:
+
+- [treasury-curve-toy.ipynb](proof-of-work/prototype-notebooks/treasury-curve-toy.ipynb): initial Treasury curve and portfolio risk prototype.
+- [treasury-curve-toy-v2.ipynb](proof-of-work/prototype-notebooks/treasury-curve-toy-v2.ipynb): expanded prototype with multi-scenario analysis, historical simulation VaR, parametric PCA VaR, and holdings ingestion experiments.
+- [treasury-curve-toy-clean.ipynb](proof-of-work/prototype-notebooks/treasury-curve-toy-clean.ipynb): cleaned notebook used as the direct source for modularizing the dashboard.
+- [spline-forward-rate-diagnostics.ipynb](proof-of-work/prototype-notebooks/spline-forward-rate-diagnostics.ipynb): diagnostics around spline curve fitting and forward-rate behavior.
+
+Note: these notebooks are not the maintained implementation. They are included to show the project development path and may contain exploratory code, intermediate outputs, and older assumptions. Secrets and local file paths have been replaced with placeholders.
+
 ## Additional Proof-of-Work Ideas
 
 The most useful proof-of-work artifacts are the ones that show judgment, debugging, validation, or methodology. Recommended additions:

@@ -54,7 +54,10 @@ RatesFactor/
 │   ├── METHODOLOGY.md
 │   ├── ASSUMPTIONS_AND_LIMITATIONS.md
 │   ├── FUTURE_SCOPE.md
-│   └── PROOF_OF_WORK.md
+│   ├── PROOF_OF_WORK.md
+│   └── proof-of-work/
+│       ├── pca-hedge-derivation.pdf
+│       └── prototype-notebooks/
 └── ratesfactor/
     ├── attribution.py
     ├── config.py

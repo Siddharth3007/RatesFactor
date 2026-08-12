@@ -101,12 +101,6 @@ The pricing engine is intentionally simplified compared with institutional syste
 - [Future Scope](docs/FUTURE_SCOPE.md)
 - [Proof of Work](docs/PROOF_OF_WORK.md)
 
-## Resume Positioning
-
-Suggested concise description:
-
-> Built a Python/Streamlit fixed-income risk analytics tool implementing key-rate DV01 decomposition, rolling PCA yield-curve factor hedging with ridge-regularized hedge solves, transaction-cost-aware hedge backtesting, and historical/parametric VaR across 21 Treasury rate-shock scenarios including Basel/IRRBB-style shocks.
-
 ## Status
 
-This is a portfolio/research prototype suitable for demonstrating fixed-income risk engineering concepts. It should not be represented as a production-grade pricing, risk, or trading system.
+This is a research prototype for Treasury risk analytics. It is not a production-grade pricing, risk, or trading system.

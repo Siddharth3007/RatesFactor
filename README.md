@@ -53,6 +53,7 @@ RatesFactor/
 ├── docs/
 │   ├── METHODOLOGY.md
 │   ├── ASSUMPTIONS_AND_LIMITATIONS.md
+│   ├── DESIGN_DECISIONS.md
 │   ├── FUTURE_SCOPE.md
 │   ├── PROOF_OF_WORK.md
 │   └── proof-of-work/
@@ -101,6 +102,7 @@ The pricing engine is intentionally simplified compared with institutional syste
 
 - [Methodology](docs/METHODOLOGY.md)
 - [Assumptions and Limitations](docs/ASSUMPTIONS_AND_LIMITATIONS.md)
+- [Design Decisions](docs/DESIGN_DECISIONS.md)
 - [Future Scope](docs/FUTURE_SCOPE.md)
 - [Proof of Work](docs/PROOF_OF_WORK.md)
 

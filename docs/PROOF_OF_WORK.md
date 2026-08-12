@@ -83,6 +83,8 @@ The most useful proof-of-work artifacts are the ones that show judgment, debuggi
      - `kupiec_unconditional_coverage`
      - `compute_pca_hedge_weights`
 
+The current design decision log is maintained here: [DESIGN_DECISIONS.md](DESIGN_DECISIONS.md).
+
 ## What Not to Add
 
 Avoid cluttering the repo with:

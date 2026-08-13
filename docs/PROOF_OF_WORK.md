@@ -21,6 +21,12 @@ where:
 - `h` is the hedge weight vector.
 - `lambda` controls ridge regularization.
 
+### PCA Derivation
+
+File: [pca-derivation.pdf](proof-of-work/pca-derivation.pdf)
+
+Four-page handwritten derivation of PCA from the covariance matrix and the variance-maximization objective. The note connects principal components to eigenvectors of the covariance matrix and also relates the covariance-eigenvector view to the SVD view.
+
 ### Prototype Notebooks
 
 Folder: [prototype-notebooks](proof-of-work/prototype-notebooks)

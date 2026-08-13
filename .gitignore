@@ -32,6 +32,8 @@ uploads/
 *.csv
 *.xlsx
 *.xls
+!templates/
+!templates/curve_construction_universe_template.xlsx
 
 # Keep downloaded templates out of git unless intentionally added later.
 ratesfactor_*_template.csv

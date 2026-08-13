@@ -12,7 +12,27 @@ The app pulls U.S. Treasury constant-maturity yield series from FRED across 11 t
 
 Daily yield changes are computed in basis points and used for PCA, scenario generation, historical simulation VaR, and hedge backtesting.
 
-## 2. Portfolio Normalization
+## 2. Pricing Curve Source and Curve Construction
+
+RatesFactor supports three pricing-curve modes:
+
+- FRED fitted Treasury curve: the default mode, using Treasury constant-maturity rates pulled from FRED.
+- Filled demo bootstrap template: a demo curve construction universe with realistic dummy prices, useful for showing the bootstrapping workflow.
+- Uploaded curve construction universe: the user downloads the template, fills in instrument prices and terms, and uploads it back into the app.
+
+The curve construction universe keeps the essential fields needed for a prototype zero-curve bootstrap:
+
+```text
+instrument_id, instrument_type, cusip, settlement_date, maturity_date,
+coupon_rate, coupon_frequency, day_count, face_value,
+clean_price, accrued_interest, dirty_price, quote_date, notes
+```
+
+For the bootstrapped modes, dirty price is used as the market PV. Bills are converted directly into discount factors. Coupon notes/bonds are bootstrapped in maturity order by discounting already-known earlier coupons and solving for the maturity discount factor. Between known points, discount factors are interpolated in log discount-factor space.
+
+This is intentionally a demo-grade bootstrapper. FRED history is still used for PCA, historical shocks, VaR, and backtesting; the bootstrapped curve is used as the latest pricing curve.
+
+## 3. Portfolio Normalization
 
 All input modes are normalized into a common portfolio schema:
 
@@ -27,7 +47,7 @@ Supported input modes:
 - iShares TLT-style holdings CSV.
 - Custom hedge instruments template.
 
-## 3. Bond Valuation
+## 4. Bond Valuation
 
 The pricing engine generates future coupon cash flows from maturity date, settlement date, coupon frequency, and face value. It computes:
 
@@ -38,9 +58,9 @@ The pricing engine generates future coupon cash flows from maturity date, settle
 
 The dashboard supports ACT/ACT, ACT/365.25, ACT/365, and ACT/360 year fractions. Treasury-style semiannual coupons are supported through the `frequency` input.
 
-Current limitation: discounting is based on fitted Treasury curve rates, not a bootstrapped zero/discount curve. This is acceptable for a prototype risk dashboard, but it is not institutional-grade fixed-income pricing.
+Current limitation: the FRED mode discounts from fitted Treasury curve rates rather than instrument-level market quotes. The bootstrapped modes demonstrate zero-curve construction, but the app remains a research-grade risk prototype rather than an institutional pricing system.
 
-## 4. DV01 and Key-Rate DV01
+## 5. DV01 and Key-Rate DV01
 
 Portfolio DV01 is computed using bump-and-reprice:
 
@@ -52,7 +72,7 @@ where the curve is shocked up/down by 1 bp.
 
 Key-rate DV01 is computed by shocking one Treasury tenor at a time and repricing the portfolio. This produces an 11-dimensional sensitivity ladder aligned to the Treasury curve tenors.
 
-## 5. PCA Yield-Curve Factors
+## 6. PCA Yield-Curve Factors
 
 PCA is fitted on historical daily Treasury yield changes. The first three components are interpreted as approximate level, slope, and curvature factors.
 
@@ -60,7 +80,7 @@ Rolling PCA creates a sign/order instability problem because PCA components can 
 
 Important note: after cosine-similarity alignment, displayed PC labels may not strictly follow descending explained variance.
 
-## 6. PCA Hedge Construction
+## 7. PCA Hedge Construction
 
 The portfolio and each hedge instrument are converted into key-rate DV01 ladders. These ladders are projected into PCA factor space:
 
@@ -88,7 +108,7 @@ Ridge regularization improves numerical stability when hedge instruments are col
 
 The handwritten hedge derivation is included as a proof-of-work artifact: [pca-hedge-derivation.pdf](proof-of-work/pca-hedge-derivation.pdf).
 
-## 7. Hedge Suitability Diagnostics
+## 8. Hedge Suitability Diagnostics
 
 The app reports diagnostics to prevent blind interpretation of hedge outputs:
 
@@ -102,7 +122,7 @@ The app reports diagnostics to prevent blind interpretation of hedge outputs:
 
 Large hedge notionals, negative hedged market value, or sign-flipped hedged P&L may occur when the hedge universe does not cover the portfolio key-rate exposure.
 
-## 8. Hedge Backtest
+## 9. Hedge Backtest
 
 The rolling hedge backtest:
 
@@ -113,7 +133,7 @@ The rolling hedge backtest:
 
 Summary statistics include average absolute P&L reduction, volatility reduction, hit rate, and total transaction costs.
 
-## 9. Scenario Analysis
+## 10. Scenario Analysis
 
 Scenario analysis applies predefined curve shocks in basis points and fully reprices the unhedged and hedged portfolios.
 
@@ -126,7 +146,7 @@ The scenario set includes custom curve-shape shocks and Basel/IRRBB-style USD sh
 - Front-end and long-end shocks.
 - Basel/IRRBB-style parallel, short-rate, steepener, and flattener scenarios.
 
-## 10. VaR and Expected Shortfall
+## 11. VaR and Expected Shortfall
 
 RatesFactor includes two VaR approaches:
 
@@ -144,7 +164,7 @@ pnl_vol = sqrt(b.T @ factor_cov @ b)
 
 Normal VaR and expected shortfall are then computed from this volatility.
 
-## 11. VaR Backtesting
+## 12. VaR Backtesting
 
 The historical VaR backtest uses rolling historical P&L windows:
 
@@ -156,7 +176,7 @@ The historical VaR backtest uses rolling historical P&L windows:
 
 This validates whether realized breach frequency is consistent with the target VaR tail probability.
 
-## 12. P&L Attribution
+## 13. P&L Attribution
 
 P&L attribution decomposes one-day portfolio P&L into PCA factor contributions and residual:
 

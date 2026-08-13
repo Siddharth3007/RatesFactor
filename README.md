@@ -7,6 +7,7 @@ The project is designed as a realistic rates risk prototype, not a production pr
 ## Highlights
 
 - Treasury curve ingestion from FRED constant-maturity Treasury series across 11 tenors.
+- Pricing curve source can be FRED, a bundled demo curve-construction universe, or a user-uploaded curve-construction universe.
 - Portfolio ingestion from a toy portfolio, a standard holdings template, or iShares TLT-style holdings files.
 - Settlement-date-aware fixed-rate bond valuation with clean value, dirty value, accrued interest, ACT/ACT support, frequency, and maturity dates.
 - Portfolio analytics: market value, weighted average maturity, weighted average coupon, DV01, effective duration, convexity, and line-item bond analytics.
@@ -72,6 +73,7 @@ RatesFactor/
     ├── risk.py
     ├── scenarios.py
     ├── templates.py
+    ├── zerocurve.py
     └── var.py
 ```
 
@@ -85,6 +87,16 @@ The app supports three portfolio modes:
 
 Custom hedge instruments can also be uploaded through a hedge-instruments template.
 
+## Curve Construction Inputs
+
+The app supports three pricing-curve modes:
+
+- **FRED fitted Treasury curve**: default mode using Treasury constant-maturity rates.
+- **Filled demo bootstrap template**: bundled dummy curve-construction universe for showing the bootstrapping workflow.
+- **Uploaded curve construction universe**: user downloads the template, fills in prices/terms, and uploads it back into the app.
+
+The curve construction template keeps the essential fields: instrument ID/type, settlement date, maturity date, coupon, coupon frequency, day count, face value, clean price, accrued interest, dirty price, quote date, and notes.
+
 ## Modeling Scope
 
 RatesFactor focuses on Treasury curve risk:
@@ -96,7 +108,7 @@ RatesFactor focuses on Treasury curve risk:
 - Scenario shocks and VaR/ES.
 - Transaction-cost-aware backtesting.
 
-The pricing engine is intentionally simplified compared with institutional systems. The current version prices from fitted Treasury curve rates rather than a fully bootstrapped zero/discount curve. This limitation is documented because every downstream risk number inherits that approximation.
+The pricing engine is intentionally simplified compared with institutional systems. FRED mode prices from fitted Treasury curve rates; the bootstrapped modes demonstrate curve construction from a template universe but are still research-grade, not a full production Treasury curve build.
 
 ## Documentation
 

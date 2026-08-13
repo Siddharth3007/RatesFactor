@@ -36,6 +36,7 @@ from ratesfactor.risk import (
 )
 from ratesfactor.scenarios import generate_irrbb_usd_scenarios, run_multi_scenario_analysis, run_scenario_analysis
 from ratesfactor.templates import (
+    curve_construction_universe_template,
     dataframe_to_csv_download,
     dataframe_to_xlsx_download,
     hedge_instruments_template,
@@ -43,6 +44,7 @@ from ratesfactor.templates import (
     tlt_holdings_template,
 )
 from ratesfactor.var import backtest_historical_var_table, compute_historical_var, compute_parametric_var
+from ratesfactor.zerocurve import bootstrap_zero_curve, load_curve_universe, zero_curve_to_rate_curve
 
 
 st.set_page_config(page_title="RatesFactor", layout="wide")
@@ -162,6 +164,12 @@ with st.sidebar:
             file_name="ratesfactor_hedge_instruments_template.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
+        st.download_button(
+            "Curve construction universe template (.xlsx)",
+            data=dataframe_to_xlsx_download(curve_construction_universe_template()),
+            file_name="ratesfactor_curve_construction_universe_template.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
 
     api_key = get_fred_api_key()
     if api_key:
@@ -208,11 +216,28 @@ with st.sidebar:
     )
     st.caption("Ridge λ trades off factor-neutrality against hedge stability: higher values shrink hedge weights but leave more residual exposure.")
     curve_fit_method = st.selectbox("Displayed curve fit", ["NSS", "Cubic spline"])
+    curve_source = st.selectbox(
+        "Pricing curve source",
+        ["fred", "demo_bootstrap", "uploaded_bootstrap"],
+        format_func=lambda x: {
+            "fred": "FRED fitted Treasury curve",
+            "demo_bootstrap": "Use filled demo bootstrap template",
+            "uploaded_bootstrap": "Upload curve construction universe",
+        }[x],
+    )
+    curve_universe_file = None
+    if curve_source == "uploaded_bootstrap":
+        curve_universe_file = st.file_uploader("Upload curve construction universe .xlsx", type=["xlsx"])
+    st.caption(
+        "Bootstrapped curve modes use dirty prices from the curve construction universe for the latest pricing curve; "
+        "FRED history is still used for PCA, historical shocks, and backtests."
+    )
 
 run_disabled = (
     (not api_key)
     or (source_type != "toy" and uploaded_file is None)
     or (hedge_universe_name == "Custom hedge template" and hedge_file is None)
+    or (curve_source == "uploaded_bootstrap" and curve_universe_file is None)
 )
 run = st.sidebar.button("Run RatesFactor", type="primary", disabled=run_disabled)
 
@@ -224,6 +249,8 @@ if not run:
         st.warning("Upload a holdings file or select the toy portfolio.")
     if hedge_universe_name == "Custom hedge template" and hedge_file is None:
         st.warning("Upload a custom hedge instruments file or choose a built-in hedge universe.")
+    if curve_source == "uploaded_bootstrap" and curve_universe_file is None:
+        st.warning("Upload a curve construction universe file or choose the FRED/demo curve option.")
     st.stop()
 
 
@@ -243,6 +270,27 @@ with st.spinner("Loading portfolio and Treasury curve history..."):
     rates_data = RatesData(rates_pct)
 
 curve_as_of_date = pd.Timestamp(rates_data.latest_date)
+base_curve = rates_data.get_curve(curve_as_of_date, units="decimal")
+zero_curve = None
+curve_universe = None
+pricing_curve_label = "FRED fitted Treasury curve"
+
+with st.spinner("Preparing pricing curve..."):
+    if curve_source == "demo_bootstrap":
+        curve_universe = curve_construction_universe_template()
+        zero_curve = bootstrap_zero_curve(curve_universe)
+        pricing_curve_label = "Demo bootstrapped zero curve"
+    elif curve_source == "uploaded_bootstrap":
+        curve_universe = load_curve_universe(curve_universe_file)
+        zero_curve = bootstrap_zero_curve(curve_universe)
+        pricing_curve_label = "Uploaded bootstrapped zero curve"
+
+    if zero_curve is not None:
+        base_curve = zero_curve_to_rate_curve(zero_curve, rates_data.tenors)
+        base_curve.name = curve_as_of_date
+        rates_data.rates_decimal.loc[curve_as_of_date, rates_data.tenors] = base_curve.to_numpy(dtype=float)
+        rates_data.rates_pct.loc[curve_as_of_date, rates_data.tenors] = base_curve.to_numpy(dtype=float) * 100.0
+
 if hedge_universe_name == "Custom hedge template":
     hedge_instruments, cost_bps = load_custom_hedge_instruments(
         hedge_file,
@@ -274,7 +322,6 @@ with st.spinner("Running PCA, hedge construction, and risk analytics..."):
         ridge_lambda=ridge_lambda,
     )
     hedged_portfolio = build_hedged_portfolio(portfolio, hedge_instruments, hedge_weights)
-    base_curve = rates_data.get_curve(curve_as_of_date, units="decimal")
     hedge_diag = hedge_diagnostics(
         portfolio,
         hedge_instruments,
@@ -307,6 +354,7 @@ col1.metric("Curve as-of date", str(curve_as_of_date.date()))
 col2.metric("Portfolio rows", len(portfolio))
 col3.metric("Target notional", format_money(portfolio["face_value"].sum()))
 col4.metric("Hedge instruments", len(hedge_instruments))
+st.caption(f"Pricing curve source: {pricing_curve_label}")
 
 if hedge_diag["severity"] == "Warning":
     st.warning(
@@ -404,6 +452,29 @@ with tabs[1]:
     st.write({
         **curve_diagnostics,
     })
+    if zero_curve is not None:
+        st.subheader("Bootstrapped Zero Curve")
+        st.caption(
+            "Discount factors are bootstrapped from the curve construction universe and interpolated in log discount-factor space."
+        )
+        zero_display = zero_curve.copy()
+        zero_display["zero_rate_pct"] = zero_display["zero_rate_cc"] * 100.0
+        st.dataframe(
+            zero_display[
+                [
+                    "instrument_id",
+                    "instrument_type",
+                    "time_to_maturity",
+                    "discount_factor",
+                    "zero_rate_pct",
+                    "dirty_price",
+                ]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+        with st.expander("Curve construction universe"):
+            st.dataframe(curve_universe, use_container_width=True, hide_index=True)
 
 with tabs[2]:
     st.subheader("DV01 and Key-Rate DV01")

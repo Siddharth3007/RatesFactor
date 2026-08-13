@@ -2,6 +2,8 @@ from io import BytesIO
 
 import pandas as pd
 
+from .zerocurve import curve_universe_template
+
 
 def dataframe_to_xlsx_download(df):
     buffer = BytesIO()
@@ -50,3 +52,7 @@ def hedge_instruments_template():
         "Settlement Date": ["2026-07-12", "2026-07-12"],
         "Day Count": ["ACT/ACT", "ACT/ACT"],
     })
+
+
+def curve_construction_universe_template():
+    return curve_universe_template()

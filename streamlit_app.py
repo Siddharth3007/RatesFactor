@@ -55,6 +55,33 @@ def cached_fetch_rates(api_key, start_date, end_date):
     return fetch_treasury_rates(TREASURY_SERIES, api_key, start_date, end_date)
 
 
+@st.cache_data(show_spinner=False)
+def cached_template_download(template_name):
+    if template_name == "Standard holdings":
+        return (
+            dataframe_to_xlsx_download(standard_holdings_template()),
+            "ratesfactor_standard_holdings_template.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    if template_name == "TLT-style holdings":
+        return (
+            dataframe_to_csv_download(tlt_holdings_template()),
+            "ratesfactor_tlt_style_holdings_template.csv",
+            "text/csv",
+        )
+    if template_name == "Custom hedge instruments":
+        return (
+            dataframe_to_xlsx_download(hedge_instruments_template()),
+            "ratesfactor_hedge_instruments_template.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    return (
+        dataframe_to_xlsx_download(curve_construction_universe_template()),
+        "ratesfactor_curve_construction_universe_template.xlsx",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
 def format_money(x):
     return f"${x:,.0f}"
 
@@ -146,29 +173,21 @@ with st.sidebar:
     st.header("Inputs")
 
     with st.expander("Download input templates"):
-        st.download_button(
-            "Standard holdings template (.xlsx)",
-            data=dataframe_to_xlsx_download(standard_holdings_template()),
-            file_name="ratesfactor_standard_holdings_template.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        template_name = st.selectbox(
+            "Template",
+            [
+                "Standard holdings",
+                "TLT-style holdings",
+                "Custom hedge instruments",
+                "Curve construction universe",
+            ],
         )
+        template_data, template_file_name, template_mime = cached_template_download(template_name)
         st.download_button(
-            "TLT-style holdings template (.csv)",
-            data=dataframe_to_csv_download(tlt_holdings_template()),
-            file_name="ratesfactor_tlt_style_holdings_template.csv",
-            mime="text/csv",
-        )
-        st.download_button(
-            "Custom hedge instruments template (.xlsx)",
-            data=dataframe_to_xlsx_download(hedge_instruments_template()),
-            file_name="ratesfactor_hedge_instruments_template.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-        st.download_button(
-            "Curve construction universe template (.xlsx)",
-            data=dataframe_to_xlsx_download(curve_construction_universe_template()),
-            file_name="ratesfactor_curve_construction_universe_template.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "Download selected template",
+            data=template_data,
+            file_name=template_file_name,
+            mime=template_mime,
         )
 
     api_key = get_fred_api_key()

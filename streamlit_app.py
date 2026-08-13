@@ -172,24 +172,6 @@ st.caption("Treasury curve risk, PCA hedging, scenarios, VaR, and attribution")
 with st.sidebar:
     st.header("Inputs")
 
-    with st.expander("Download input templates"):
-        template_name = st.selectbox(
-            "Template",
-            [
-                "Standard holdings",
-                "TLT-style holdings",
-                "Custom hedge instruments",
-                "Curve construction universe",
-            ],
-        )
-        template_data, template_file_name, template_mime = cached_template_download(template_name)
-        st.download_button(
-            "Download selected template",
-            data=template_data,
-            file_name=template_file_name,
-            mime=template_mime,
-        )
-
     api_key = get_fred_api_key()
     if api_key:
         st.caption("FRED API key loaded from local secrets/config.")
@@ -251,6 +233,27 @@ with st.sidebar:
         "Bootstrapped curve modes use dirty prices from the curve construction universe for the latest pricing curve; "
         "FRED history is still used for PCA, historical shocks, and backtests."
     )
+
+    with st.expander("Download input templates"):
+        st.caption("Template files are prepared only when requested to keep app startup fast.")
+        prepare_template = st.checkbox("Prepare a template download")
+        if prepare_template:
+            template_name = st.selectbox(
+                "Template",
+                [
+                    "Standard holdings",
+                    "TLT-style holdings",
+                    "Custom hedge instruments",
+                    "Curve construction universe",
+                ],
+            )
+            template_data, template_file_name, template_mime = cached_template_download(template_name)
+            st.download_button(
+                "Download selected template",
+                data=template_data,
+                file_name=template_file_name,
+                mime=template_mime,
+            )
 
 run_disabled = (
     (not api_key)

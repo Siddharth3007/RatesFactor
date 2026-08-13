@@ -194,6 +194,60 @@ def run_pca_hedge_backtest(
     return results
 
 
+def run_fixed_hedge_backtest(
+    portfolio,
+    hedge_instruments,
+    hedge_weights,
+    rates_data,
+    cost_bps,
+    max_backtest_days=120,
+):
+    if len(cost_bps) != len(hedge_instruments):
+        raise ValueError("cost_bps must have the same length as hedge_instruments")
+
+    results = {}
+    h = np.asarray(hedge_weights, dtype=float)
+    hedged_portfolio = build_hedged_portfolio(portfolio, hedge_instruments, h)
+    dates = np.array(list(rates_data.daily_changes_bp.index))
+    backtest_dates = list(zip(dates[:-1], dates[1:]))
+    if max_backtest_days is not None:
+        backtest_dates = backtest_dates[-int(max_backtest_days):]
+
+    for idx, (date, next_date) in enumerate(backtest_dates):
+        date = pd.Timestamp(date)
+        next_date = pd.Timestamp(next_date)
+
+        rate_curve_next = rates_data.get_curve(next_date, "decimal")
+        rate_curve_curr = rates_data.get_curve(date, "decimal")
+
+        unhedged_pnl = (
+            portfolio_value(portfolio, rate_curve_next, settlement_date=next_date)
+            - portfolio_value(portfolio, rate_curve_curr, settlement_date=date)
+        )
+        hedged_pnl = (
+            portfolio_value(hedged_portfolio, rate_curve_next, settlement_date=next_date)
+            - portfolio_value(hedged_portfolio, rate_curve_curr, settlement_date=date)
+        )
+
+        turnover = abs(h) if idx == 0 else np.zeros_like(h)
+        traded_notional = turnover * hedge_instruments["face_value"].values
+        transaction_cost = (cost_bps * traded_notional).sum() / 10000
+        net_hedged_pnl = hedged_pnl - transaction_cost
+
+        results[date] = {
+            "unhedged_pnl": unhedged_pnl,
+            "hedged_pnl": hedged_pnl,
+            "net_hedged_pnl": net_hedged_pnl,
+            "pnl_reduction": abs(unhedged_pnl) - abs(hedged_pnl),
+            "net_pnl_reduction": abs(unhedged_pnl) - abs(net_hedged_pnl),
+            "hedge_weights": h,
+            "turnover": turnover,
+            "transaction_cost": transaction_cost,
+        }
+
+    return results
+
+
 def summarize_backtest_results(results, hedge_instruments):
     results_df = pd.DataFrame.from_dict(results, orient="index")
     results_df.index = pd.to_datetime(results_df.index)

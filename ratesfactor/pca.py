@@ -55,12 +55,15 @@ def align_pca_to_reference(pca, reference_components):
     return pca
 
 
-def fit_rolling_pca(daily_changes_bp, lookback=252, n_components=3):
+def fit_rolling_pca(daily_changes_bp, lookback=252, n_components=3, max_windows=None):
     dates = np.array(daily_changes_bp.index)
     rolling_pca = {}
     reference_components = None
+    start_idx = lookback
+    if max_windows is not None:
+        start_idx = max(lookback, len(daily_changes_bp) + 1 - int(max_windows))
 
-    for idx in range(lookback, len(daily_changes_bp) + 1):
+    for idx in range(start_idx, len(daily_changes_bp) + 1):
         window = daily_changes_bp.iloc[idx - lookback : idx]
         pca_window = fit_pca(window, n_components=n_components)
         if reference_components is not None:

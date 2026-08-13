@@ -133,6 +133,7 @@ def run_pca_hedge_backtest(
     lookback=252,
     n_components=3,
     ridge_lambda=1e-4,
+    max_backtest_days=None,
 ):
     if len(cost_bps) != len(hedge_instruments):
         raise ValueError("cost_bps must have the same length as hedge_instruments")
@@ -141,7 +142,11 @@ def run_pca_hedge_backtest(
     prev_h = None
     dates = np.array(list(rates_data.daily_changes_bp.index))
 
-    for date, next_date in zip(dates[lookback - 1 : -1], dates[lookback:]):
+    backtest_dates = list(zip(dates[lookback - 1 : -1], dates[lookback:]))
+    if max_backtest_days is not None:
+        backtest_dates = backtest_dates[-int(max_backtest_days):]
+
+    for date, next_date in backtest_dates:
         date = pd.Timestamp(date)
         next_date = pd.Timestamp(next_date)
 

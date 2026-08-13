@@ -206,6 +206,14 @@ with st.sidebar:
         hedge_file = st.file_uploader("Upload custom hedge instruments .xlsx", type=["xlsx"])
     alpha = st.selectbox("VaR significance level", [0.05, 0.01], format_func=lambda x: f"{x:.0%} tail / {(1-x):.0%} VaR")
     lookback = st.number_input("PCA / VaR lookback days", min_value=60, max_value=1000, value=252, step=21)
+    max_backtest_days = st.number_input(
+        "Rolling hedge backtest days",
+        min_value=30,
+        max_value=1000,
+        value=120,
+        step=30,
+        help="Caps the number of rolling hedge backtest observations. Lower values make public demos much faster.",
+    )
     ridge_lambda = st.number_input(
         "Hedge ridge regularization",
         min_value=0.0,
@@ -364,6 +372,7 @@ with st.spinner("Running hedge backtest and VaR validation inputs..."):
         lookback=int(lookback),
         n_components=n_components,
         ridge_lambda=ridge_lambda,
+        max_backtest_days=int(max_backtest_days),
     )
     results_df, summary, hedge_labels, hedge_weight_cols, _ = summarize_backtest_results(
         backtest_results,

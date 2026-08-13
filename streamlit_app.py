@@ -12,7 +12,6 @@ from ratesfactor.data import RatesData, fetch_treasury_rates
 from ratesfactor.hedging import (
     compute_pca_hedge_weights,
     hedge_diagnostics,
-    run_fixed_hedge_backtest,
     run_pca_hedge_backtest,
     summarize_backtest_results,
 )
@@ -215,15 +214,6 @@ with st.sidebar:
         step=30,
         help="Caps the number of rolling hedge backtest observations. Lower values make public demos much faster.",
     )
-    backtest_mode = st.selectbox(
-        "Hedge backtest mode",
-        ["fast_fixed", "full_rolling"],
-        format_func=lambda x: {
-            "fast_fixed": "Fast demo: latest hedge replay",
-            "full_rolling": "Full rolling PCA hedge recalculation",
-        }[x],
-        help="Fast demo mode keeps the latest hedge fixed and replays recent P&L. Full rolling mode recalculates PCA hedge weights through time and can be slow on Streamlit Cloud.",
-    )
     ridge_lambda = st.number_input(
         "Hedge ridge regularization",
         min_value=0.0,
@@ -371,33 +361,23 @@ with st.spinner("Running PCA, hedge construction, and risk analytics..."):
     )
 
 with st.spinner("Running hedge backtest and VaR validation inputs..."):
-    if backtest_mode == "full_rolling":
-        rolling_pca = fit_rolling_pca(
-            rates_data.daily_changes_bp,
-            lookback=int(lookback),
-            n_components=3,
-            max_windows=int(max_backtest_days) + 1,
-        )
-        backtest_results = run_pca_hedge_backtest(
-            portfolio,
-            hedge_instruments,
-            rates_data,
-            rolling_pca,
-            cost_bps,
-            lookback=int(lookback),
-            n_components=n_components,
-            ridge_lambda=ridge_lambda,
-            max_backtest_days=int(max_backtest_days),
-        )
-    else:
-        backtest_results = run_fixed_hedge_backtest(
-            portfolio,
-            hedge_instruments,
-            hedge_weights,
-            rates_data,
-            cost_bps,
-            max_backtest_days=int(max_backtest_days),
-        )
+    rolling_pca = fit_rolling_pca(
+        rates_data.daily_changes_bp,
+        lookback=int(lookback),
+        n_components=3,
+        max_windows=int(max_backtest_days) + 1,
+    )
+    backtest_results = run_pca_hedge_backtest(
+        portfolio,
+        hedge_instruments,
+        rates_data,
+        rolling_pca,
+        cost_bps,
+        lookback=int(lookback),
+        n_components=n_components,
+        ridge_lambda=ridge_lambda,
+        max_backtest_days=int(max_backtest_days),
+    )
     results_df, summary, hedge_labels, hedge_weight_cols, _ = summarize_backtest_results(
         backtest_results,
         hedge_instruments,
@@ -410,10 +390,7 @@ col2.metric("Portfolio rows", len(portfolio))
 col3.metric("Target notional", format_money(portfolio["face_value"].sum()))
 col4.metric("Hedge instruments", len(hedge_instruments))
 st.caption(f"Pricing curve source: {pricing_curve_label}")
-st.caption(
-    "Hedge backtest mode: "
-    + ("latest fixed hedge replay" if backtest_mode == "fast_fixed" else "full rolling PCA hedge recalculation")
-)
+st.caption(f"Rolling PCA hedge backtest observations: latest {int(max_backtest_days)} days")
 
 if hedge_diag["severity"] == "Warning":
     st.warning(
@@ -598,9 +575,9 @@ with tabs[3]:
     c3.metric("Net hit rate", f"{summary['net_hit_rate']:.2%}")
     c4.metric("Total transaction cost", format_money(summary["total_transaction_cost"]))
     st.caption(
-        "Fast demo mode replays recent P&L using the latest hedge weights. Full rolling mode recalculates PCA hedge "
-        "weights through time, but can be slow on Streamlit Cloud. If the hedge universe is maturity-mismatched, "
-        "check the Portfolio tab's hedge suitability diagnostics before interpreting results."
+        "The backtest recalculates PCA hedge weights through time for the selected rolling window. Larger windows can "
+        "be slow on Streamlit Cloud. If the hedge universe is maturity-mismatched, check the Portfolio tab's hedge "
+        "suitability diagnostics before interpreting results."
     )
     st.plotly_chart(backtest_figure(results_df, hedge_weight_cols), use_container_width=True)
     st.plotly_chart(transaction_cost_figure(results_df), use_container_width=True)

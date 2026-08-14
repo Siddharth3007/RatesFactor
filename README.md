@@ -1,3 +1,5 @@
+![RatesFactor logo](assets/ratesfactor-logo.png)
+
 # RatesFactor
 
 RatesFactor answers three practical Treasury risk questions: where does rate exposure live on the curve, does a PCA hedge actually reduce that exposure, and does the hedge still look reasonable after transaction costs, VaR checks, and a mismatched hedge universe.

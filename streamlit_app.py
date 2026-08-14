@@ -866,6 +866,11 @@ with tabs[3]:
         "This is a configurable modeling assumption, not a universal execution-cost estimate."
     )
     st.plotly_chart(backtest_figure(results_df, hedge_weight_cols), use_container_width=True)
+    st.caption(
+        f"PCA hedge weights are recalculated every {int(pca_stride)} day(s) and held constant between rebalances, "
+        "so the hedge-weight lines are expected to look stepwise. Large jumps usually point to a changing PCA regime, "
+        "an ill-conditioned hedge universe, or a ridge regularization setting that is too low for the selected instruments."
+    )
     st.plotly_chart(transaction_cost_figure(results_df), use_container_width=True)
     st.write("Rolling Hedge Backtest - Summary")
     st.dataframe(formatted_summary_table(summary), use_container_width=True, hide_index=True)

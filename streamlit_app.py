@@ -330,16 +330,24 @@ with st.sidebar:
             "Rolling hedge backtest days",
             min_value=30,
             max_value=1000,
-            value=60,
+            value=750,
             step=30,
-            help="Caps the number of rolling hedge backtest observations. Lower values make public demos much faster.",
+            help="Number of daily P&L observations replayed in the rolling hedge backtest.",
+        )
+        pca_stride = st.number_input(
+            "Rolling PCA rebalance stride",
+            min_value=1,
+            max_value=60,
+            value=10,
+            step=1,
+            help="Recompute PCA hedge weights every N backtest days and hold the previous hedge between rebalances.",
         )
         var_backtest_lookback = st.number_input(
             "VaR backtest lookback days",
             min_value=20,
-            max_value=500,
-            value=30,
-            step=10,
+            max_value=750,
+            value=300,
+            step=25,
             help="Rolling P&L window used only for the Kupiec VaR breach test. Keep it below the hedge backtest days to show results.",
         )
         ridge_lambda = st.number_input(
@@ -497,6 +505,7 @@ if run:
             lookback=int(lookback),
             n_components=3,
             max_windows=int(max_backtest_days) + 1,
+            stride=int(pca_stride),
         )
         backtest_results = run_pca_hedge_backtest(
             portfolio,
@@ -536,6 +545,7 @@ if run:
         "hedge_weight_cols": hedge_weight_cols,
         "lookback": int(lookback),
         "var_backtest_lookback": int(var_backtest_lookback),
+        "pca_stride": int(pca_stride),
         "alpha": alpha,
         "max_backtest_days": int(max_backtest_days),
         "curve_fit_method": curve_fit_method,
@@ -562,6 +572,7 @@ hedge_labels = state["hedge_labels"]
 hedge_weight_cols = state["hedge_weight_cols"]
 lookback = state["lookback"]
 var_backtest_lookback = state["var_backtest_lookback"]
+pca_stride = state["pca_stride"]
 alpha = state["alpha"]
 max_backtest_days = state["max_backtest_days"]
 curve_fit_method = state["curve_fit_method"]
@@ -573,7 +584,10 @@ col2.metric("Portfolio rows", len(portfolio))
 col3.metric("Target notional", format_money(portfolio["face_value"].sum()))
 col4.metric("Hedge instruments", len(hedge_instruments))
 st.caption(f"Pricing curve source: {pricing_curve_label}")
-st.caption(f"Rolling PCA hedge backtest observations: latest {int(max_backtest_days)} days")
+st.caption(
+    f"Rolling PCA hedge backtest observations: latest {int(max_backtest_days)} days; "
+    f"PCA hedge weights are rebalanced every {int(pca_stride)} day(s)."
+)
 
 if hedge_diag["severity"] == "Warning":
     st.warning(
@@ -669,6 +683,10 @@ with tabs[1]:
         use_container_width=True,
     )
     c2.plotly_chart(pca_loadings_figure(latest_pca, rates_data.tenors), use_container_width=True)
+    st.caption(
+        f"The displayed PCA loadings are from the latest rolling PCA fit using the most recent {int(lookback)} "
+        "daily curve-change observations."
+    )
     st.caption(
         "Rolling PCA factors are aligned by cosine similarity for economic continuity, so displayed PC labels may not "
         "strictly follow descending explained variance after alignment."
@@ -817,9 +835,9 @@ with tabs[3]:
     metric_with_help(c3, "Net hit rate", f"{summary['net_hit_rate']:.2%}")
     c4.metric("Total transaction cost", format_money(summary["total_transaction_cost"]))
     st.caption(
-        "The backtest recalculates PCA hedge weights through time for the selected rolling window. Larger windows can "
-        "be slow on Streamlit Cloud. If the hedge universe is maturity-mismatched, check the Portfolio tab's hedge "
-        "suitability diagnostics before interpreting results."
+        "The backtest replays daily P&L through the selected rolling hedge window. PCA hedge weights are recalculated "
+        f"every {int(pca_stride)} day(s) and held between rebalances. If the hedge universe is maturity-mismatched, "
+        "check the Portfolio tab's hedge suitability diagnostics before interpreting results."
     )
     st.caption(
         "Transaction costs use a bps-on-notional-change assumption: daily cost = |change in hedge notional| x cost bps / 10,000. "
@@ -914,7 +932,7 @@ with tabs[5]:
             "Rolling historical VaR is computed from prior P&L observations and compared with the next realized daily loss. "
             "Kupiec p-value tests unconditional coverage; low values suggest breach frequency differs from the target tail rate. "
             f"The VaR/ES model lookback is {int(lookback)} days; this Kupiec panel uses a shorter "
-            f"{int(var_backtest_lookback)}-day rolling P&L window so the public demo remains responsive."
+            f"{int(var_backtest_lookback)}-day rolling P&L window."
         )
         st.dataframe(
             var_backtest,

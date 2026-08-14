@@ -150,15 +150,21 @@ def run_pca_hedge_backtest(
         date = pd.Timestamp(date)
         next_date = pd.Timestamp(next_date)
 
-        h = compute_pca_hedge_weights(
-            portfolio,
-            hedge_instruments,
-            rates_data,
-            date,
-            rolling_pca[date]["pca"],
-            n_components=n_components,
-            ridge_lambda=ridge_lambda,
-        )
+        if date in rolling_pca:
+            h = compute_pca_hedge_weights(
+                portfolio,
+                hedge_instruments,
+                rates_data,
+                date,
+                rolling_pca[date]["pca"],
+                n_components=n_components,
+                ridge_lambda=ridge_lambda,
+            )
+        elif prev_h is None:
+            continue
+        else:
+            h = prev_h
+
         hedged_portfolio = build_hedged_portfolio(portfolio, hedge_instruments, h)
 
         rate_curve_next = rates_data.get_curve(next_date, "decimal")

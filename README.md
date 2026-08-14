@@ -27,6 +27,10 @@ It is a research-grade fixed-income risk analytics dashboard, not a production p
 
 The core analytics code was written by me, including the bond pricer, portfolio data readers, FRED data pull, yield-curve fitting, zero-curve bootstrapper, PCA engine, hedge construction, hedge backtests, VaR/ES, VaR backtesting, and P&L attribution. I used Claude as an engineering assistant for the Streamlit app layer and visualization code. The dashboard design, UI decisions, feature choices, and implementation direction were still mine; the AI assistance was used to speed up presentation, wiring, and deployment work around the fixed-income engine.
 
+## How This Was Built
+
+The project started as a set of research notebooks where I hand-derived the PCA hedge solve, tested the bond-pricing and key-rate ladder mechanics, and then refactored the working pieces into a Python package plus a Streamlit dashboard. The fixed-income methodology was built around Treasury cash-flow pricing, DV01/key-rate exposure, rolling PCA factor extraction, ridge-regularized least-squares hedging, historical/parametric VaR, Kupiec backtesting, and scenario stress testing; the handwritten hedge derivation is included here: [pca-hedge-derivation.pdf](docs/proof-of-work/pca-hedge-derivation.pdf). I used Python, pandas, NumPy, scikit-learn, SciPy, Plotly, Streamlit, and FRED data, with AI coding assistance used mainly to speed up app wiring, visualization formatting, documentation cleanup, and deployment workflow.
+
 ## Dashboard
 
 Run the Streamlit app locally:

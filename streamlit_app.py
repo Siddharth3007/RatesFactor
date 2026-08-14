@@ -376,7 +376,7 @@ with st.sidebar:
             "Hedge ridge regularization",
             min_value=0.0,
             max_value=10.0,
-            value=0.01,
+            value=0.10,
             step=0.001,
             format="%.6f",
             help="Higher values reduce unstable hedge weights but allow more residual factor exposure.",

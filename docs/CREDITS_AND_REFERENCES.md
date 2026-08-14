@@ -4,7 +4,7 @@ This project was built as an independent implementation, but the theory and meth
 
 ## Academic and Course References
 
-- Professor Scott Chiu's fixed-income course notes, Fall 2025.
+- Professor Scott Chiu's fixed-income course notes, Rutgers MQF, Fall 2025.
 
 ## PCA, Yield-Curve Factors, and Hedging
 

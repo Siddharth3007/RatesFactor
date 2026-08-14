@@ -1,3 +1,4 @@
+import inspect
 import os
 from datetime import date
 
@@ -54,6 +55,27 @@ st.set_page_config(page_title="RatesFactor", layout="wide")
 @st.cache_data(show_spinner=False)
 def cached_fetch_rates(api_key, start_date, end_date):
     return fetch_treasury_rates(TREASURY_SERIES, api_key, start_date, end_date)
+
+
+def fit_rolling_pca_for_rebalance(daily_changes_bp, lookback, n_components, max_windows, stride):
+    kwargs = {
+        "lookback": int(lookback),
+        "n_components": int(n_components),
+        "max_windows": int(max_windows),
+    }
+    if "stride" in inspect.signature(fit_rolling_pca).parameters:
+        kwargs["stride"] = int(stride)
+        return fit_rolling_pca(daily_changes_bp, **kwargs)
+
+    rolling_pca = fit_rolling_pca(daily_changes_bp, **kwargs)
+    if int(stride) <= 1:
+        return rolling_pca
+
+    return {
+        date: pca_result
+        for idx, (date, pca_result) in enumerate(rolling_pca.items())
+        if idx % int(stride) == 0
+    }
 
 
 @st.cache_data(show_spinner=False)
@@ -500,7 +522,7 @@ if run:
         )
 
     with st.spinner("Running hedge backtest and VaR validation inputs..."):
-        rolling_pca = fit_rolling_pca(
+        rolling_pca = fit_rolling_pca_for_rebalance(
             rates_data.daily_changes_bp,
             lookback=int(lookback),
             n_components=3,

@@ -92,6 +92,90 @@ def format_tenor(x):
     return f"{float(x):g}Y"
 
 
+METRIC_HELP = {
+    "Weighted avg maturity": "Face-value-weighted average maturity of the active portfolio.",
+    "Weighted avg coupon": "Face-value-weighted average coupon across the active portfolio.",
+    "Market / dirty value": "Present value including accrued interest, using the selected pricing curve source.",
+    "DV01": "Dollar change in portfolio value for a 1 bp parallel move in rates.",
+    "Effective duration": "Approximate percentage price sensitivity to a small parallel yield-curve shift.",
+    "Convexity": "Second-order sensitivity of portfolio value to rate moves.",
+    "Largest KRD bucket": "Treasury tenor where the portfolio has the largest absolute key-rate DV01.",
+    "Largest KRD share": "Largest absolute key-rate DV01 divided by total absolute key-rate DV01.",
+    "Suitability": "Default warning based on hedge-universe coverage. The threshold is a practical 1.5x heuristic, not a theoretical boundary.",
+    "Condition number": "Higher values mean hedge instruments are close to collinear, making the hedge solve numerically unstable.",
+    "Residual factor norm": "||Ah - y||: factor exposure left unneutralized after applying the hedge weights.",
+    "Net hit rate": "Percent of days where net hedged P&L had smaller absolute magnitude than unhedged P&L.",
+    "Net vol reduction": "Percent reduction in daily P&L volatility after transaction costs.",
+    "Net P&L reduction": "Percent reduction in average absolute daily P&L after transaction costs.",
+    "Gross P&L reduction": "Percent reduction in average absolute daily P&L before transaction costs.",
+    "Forward turning points": "Number of local direction changes in the fitted forward curve. Useful as a curve-shape diagnostic, not a trading signal.",
+}
+
+
+def metric_with_help(container, label, value, key=None):
+    return container.metric(label, value, help=METRIC_HELP.get(key or label))
+
+
+def formatted_scenario_table(df):
+    display_df = df.copy()
+    for col in ["unhedged_pnl", "hedged_pnl", "pnl_reduction"]:
+        if col in display_df:
+            display_df[col] = display_df[col].map(format_money)
+    return display_df.rename(
+        columns={
+            "scenario_name": "Scenario",
+            "unhedged_pnl": "Unhedged P&L",
+            "hedged_pnl": "Hedged P&L",
+            "pnl_reduction": "Abs P&L Reduction",
+        }
+    )
+
+
+def formatted_summary_table(summary):
+    display = summary.to_frame("Value").reset_index().rename(columns={"index": "Metric"})
+    pct_metrics = [name for name in display["Metric"] if "pct" in str(name) or "rate" in str(name)]
+    money_metrics = [name for name in display["Metric"] if "cost" in str(name) or "pnl" in str(name)]
+
+    def format_value(row):
+        value = row["Value"]
+        metric = row["Metric"]
+        if metric in pct_metrics:
+            return f"{value:.2%}"
+        if metric in money_metrics:
+            return format_money(value)
+        return f"{value:,.4f}" if isinstance(value, float) else value
+
+    display["Value"] = display.apply(format_value, axis=1)
+    display["Metric"] = display["Metric"].str.replace("_", " ").str.title()
+    return display
+
+
+def formatted_var_table(df):
+    display_df = df.copy()
+    money_cols = ["VaR", "Expected Shortfall", "worst_pnl", "best_pnl", "avg_pnl", "pnl_vol"]
+    for col in money_cols:
+        if col in display_df:
+            display_df[col] = display_df[col].map(format_money)
+    return display_df
+
+
+def formatted_parametric_var_table(param_var):
+    display_df = pd.DataFrame(param_var).T.reset_index().rename(columns={"index": "Portfolio"})
+    money_cols = ["VaR", "Expected Shortfall", "pnl_vol"]
+    for col in money_cols:
+        if col in display_df:
+            display_df[col] = display_df[col].map(format_money)
+    if "factor_exposures" in display_df:
+        display_df["factor_exposures"] = display_df["factor_exposures"].map(
+            lambda values: ", ".join(f"{float(x):,.2f}" for x in values)
+        )
+    if "alpha" in display_df:
+        display_df["alpha"] = display_df["alpha"].map(lambda x: f"{float(x):.2%}")
+    if "confidence_level" in display_df:
+        display_df["confidence_level"] = display_df["confidence_level"].map(lambda x: f"{float(x):.2%}")
+    return display_df
+
+
 def line_item_display_table(line_item_df):
     display_df = line_item_df.copy()
     display_df = display_df[
@@ -193,8 +277,6 @@ with st.sidebar:
         uploaded_file = st.file_uploader("Upload iShares TLT holdings .csv", type=["csv"])
 
     holdings_as_of_date = st.date_input("Holdings / risk as-of date", value=date(2026, 7, 12))
-    day_count = st.selectbox("Day count convention", ["ACT/ACT", "ACT/365.25", "ACT/365", "ACT/360"])
-    history_years = st.number_input("Curve history window (years)", min_value=1, max_value=15, value=5, step=1)
     target_notional = st.number_input("Target portfolio notional", min_value=100_000, value=10_000_000, step=100_000)
 
     hedge_universe_name = st.selectbox(
@@ -204,43 +286,47 @@ with st.sidebar:
     hedge_file = None
     if hedge_universe_name == "Custom hedge template":
         hedge_file = st.file_uploader("Upload custom hedge instruments .xlsx", type=["xlsx"])
-    alpha = st.selectbox("VaR significance level", [0.05, 0.01], format_func=lambda x: f"{x:.0%} tail / {(1-x):.0%} VaR")
-    lookback = st.number_input("PCA / VaR lookback days", min_value=60, max_value=1000, value=252, step=21)
-    max_backtest_days = st.number_input(
-        "Rolling hedge backtest days",
-        min_value=30,
-        max_value=1000,
-        value=120,
-        step=30,
-        help="Caps the number of rolling hedge backtest observations. Lower values make public demos much faster.",
-    )
-    ridge_lambda = st.number_input(
-        "Hedge ridge regularization",
-        min_value=0.0,
-        max_value=10.0,
-        value=0.01,
-        step=0.001,
-        format="%.6f",
-        help="Higher values reduce unstable hedge weights but allow more residual factor exposure.",
-    )
-    st.caption("Ridge λ trades off factor-neutrality against hedge stability: higher values shrink hedge weights but leave more residual exposure.")
-    curve_fit_method = st.selectbox("Displayed curve fit", ["NSS", "Cubic spline"])
-    curve_source = st.selectbox(
-        "Pricing curve source",
-        ["fred", "demo_bootstrap", "uploaded_bootstrap"],
-        format_func=lambda x: {
-            "fred": "FRED fitted Treasury curve",
-            "demo_bootstrap": "Use filled demo bootstrap template",
-            "uploaded_bootstrap": "Upload curve construction universe",
-        }[x],
-    )
-    curve_universe_file = None
-    if curve_source == "uploaded_bootstrap":
-        curve_universe_file = st.file_uploader("Upload curve construction universe .xlsx", type=["xlsx"])
-    st.caption(
-        "Bootstrapped curve modes use dirty prices from the curve construction universe for the latest pricing curve; "
-        "FRED history is still used for PCA, historical shocks, and backtests."
-    )
+
+    with st.expander("Advanced settings"):
+        day_count = st.selectbox("Day count convention", ["ACT/ACT", "ACT/365.25", "ACT/365", "ACT/360"])
+        history_years = st.number_input("Curve history window (years)", min_value=1, max_value=15, value=5, step=1)
+        alpha = st.selectbox("VaR significance level", [0.05, 0.01], format_func=lambda x: f"{x:.0%} tail / {(1-x):.0%} VaR")
+        lookback = st.number_input("PCA / VaR lookback days", min_value=60, max_value=1000, value=252, step=21)
+        max_backtest_days = st.number_input(
+            "Rolling hedge backtest days",
+            min_value=30,
+            max_value=1000,
+            value=120,
+            step=30,
+            help="Caps the number of rolling hedge backtest observations. Lower values make public demos much faster.",
+        )
+        ridge_lambda = st.number_input(
+            "Hedge ridge regularization",
+            min_value=0.0,
+            max_value=10.0,
+            value=0.01,
+            step=0.001,
+            format="%.6f",
+            help="Higher values reduce unstable hedge weights but allow more residual factor exposure.",
+        )
+        st.caption("Ridge λ trades off factor-neutrality against hedge stability: higher values shrink hedge weights but leave more residual exposure.")
+        curve_fit_method = st.selectbox("Displayed curve fit", ["NSS", "Cubic spline"])
+        curve_source = st.selectbox(
+            "Pricing curve source",
+            ["fred", "demo_bootstrap", "uploaded_bootstrap"],
+            format_func=lambda x: {
+                "fred": "FRED fitted Treasury curve",
+                "demo_bootstrap": "Use filled demo bootstrap template",
+                "uploaded_bootstrap": "Upload curve construction universe",
+            }[x],
+        )
+        curve_universe_file = None
+        if curve_source == "uploaded_bootstrap":
+            curve_universe_file = st.file_uploader("Upload curve construction universe .xlsx", type=["xlsx"])
+        st.caption(
+            "Bootstrapped curve modes use dirty prices from the curve construction universe for the latest pricing curve; "
+            "FRED history is still used for PCA, historical shocks, and backtests."
+        )
 
     with st.expander("Download input templates"):
         st.caption("Template files are prepared only when requested to keep app startup fast.")
@@ -467,31 +553,31 @@ with tabs[0]:
     portfolio_values = portfolio_valuation(portfolio, base_curve, settlement_date=curve_as_of_date)
     line_item_df = line_item_bond_analytics(portfolio, rates_data, curve_as_of_date)
     c1, c2, c3 = st.columns(3)
-    c1.metric("Weighted avg maturity", f"{portfolio_stats['weighted_avg_maturity']:.2f}Y")
-    c2.metric("Weighted avg coupon", f"{portfolio_stats['weighted_avg_coupon']:.2%}")
-    c3.metric("Market / dirty value", format_money(portfolio_values["dirty_value"]))
+    metric_with_help(c1, "Weighted avg maturity", f"{portfolio_stats['weighted_avg_maturity']:.2f}Y")
+    metric_with_help(c2, "Weighted avg coupon", f"{portfolio_stats['weighted_avg_coupon']:.2%}")
+    metric_with_help(c3, "Market / dirty value", format_money(portfolio_values["dirty_value"]))
     st.dataframe(
         line_item_display_table(line_item_df),
         use_container_width=True,
         hide_index=True,
     )
     with st.expander("Raw portfolio inputs"):
-        st.dataframe(portfolio, use_container_width=True)
+        st.dataframe(portfolio, use_container_width=True, hide_index=True)
     st.subheader("Hedge Instruments")
     hedge_display = hedge_instruments.copy()
     hedge_display["hedge_weight"] = hedge_weights
-    st.dataframe(hedge_display, use_container_width=True)
+    st.dataframe(hedge_display, use_container_width=True, hide_index=True)
     st.subheader("Hedge Suitability Diagnostics")
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Suitability", hedge_diag["severity"])
-    c2.metric("Condition number", f"{hedge_diag['condition_number']:.1f}")
+    metric_with_help(c1, "Suitability", hedge_diag["severity"])
+    metric_with_help(c2, "Condition number", f"{hedge_diag['condition_number']:.1f}")
     c3.metric("Hedge / portfolio notional", f"{hedge_diag['hedge_notional_ratio']:.2f}x")
-    c4.metric("Top portfolio KRD bucket", format_tenor(hedge_diag["top_krd_bucket"]))
+    metric_with_help(c4, "Top portfolio KRD bucket", format_tenor(hedge_diag["top_krd_bucket"]), key="Largest KRD bucket")
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Portfolio WAM", f"{hedge_diag['portfolio_wam']:.2f}Y")
-    c2.metric("Hedge universe WAM", f"{hedge_diag['hedge_wam']:.2f}Y")
+    metric_with_help(c1, "Portfolio WAM", f"{hedge_diag['portfolio_wam']:.2f}Y", key="Weighted avg maturity")
+    metric_with_help(c2, "Hedge universe WAM", f"{hedge_diag['hedge_wam']:.2f}Y", key="Weighted avg maturity")
     c3.metric("Max hedge maturity", f"{hedge_diag['max_hedge_maturity']:.2f}Y")
-    c4.metric("Residual factor norm", f"{hedge_diag['factor_residual_norm']:.2f}")
+    metric_with_help(c4, "Residual factor norm", f"{hedge_diag['factor_residual_norm']:.2f}")
     st.caption(
         "Large hedge notionals, negative hedged market value, or sign-flipped hedged P&L can occur when the selected "
         "hedge universe does not cover the portfolio's key-rate exposure; use the suitability diagnostics before "
@@ -538,9 +624,36 @@ with tabs[1]:
         "Rolling PCA factors are aligned by cosine similarity for economic continuity, so displayed PC labels may not "
         "strictly follow descending explained variance after alignment."
     )
-    st.write({
-        **curve_diagnostics,
-    })
+    st.caption(
+        "Static explained variance is fit once on the full rate-history sample. Latest rolling explained variance is "
+        "fit on the most recent PCA window and is what drives the current hedge, so it can differ when the recent "
+        "rate regime differs from the full sample."
+    )
+    d1, d2, d3, d4 = st.columns(4)
+    d1.metric(
+        "Latest rolling EV",
+        ", ".join(f"{x:.1%}" for x in latest_pca.explained_variance_ratio_[:3]),
+        help="Explained variance from the latest rolling PCA window used for current hedge construction.",
+    )
+    d2.metric(
+        "Static EV",
+        ", ".join(f"{x:.1%}" for x in static_pca.explained_variance_ratio_[:3]),
+        help="Explained variance from a PCA fit once on the full historical curve-change sample.",
+    )
+    d3.metric("Displayed fit", curve_fit_method)
+    d4.metric(
+        "Forward turning points",
+        curve_diagnostics["Fitted forward turning points"],
+        help=METRIC_HELP["Forward turning points"],
+    )
+    with st.expander("Curve diagnostics"):
+        st.dataframe(
+            pd.DataFrame(
+                [{"Metric": key, "Value": value} for key, value in curve_diagnostics.items()]
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
     if zero_curve is not None:
         st.subheader("Bootstrapped Zero Curve")
         st.caption(
@@ -581,14 +694,14 @@ with tabs[2]:
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Unhedged value", format_money(unhedged_value))
     c2.metric("Hedged value", format_money(hedged_value))
-    c3.metric("Unhedged parallel DV01", format_money(unhedged_dv01))
-    c4.metric("Hedged parallel DV01", format_money(hedged_dv01))
+    metric_with_help(c3, "Unhedged parallel DV01", format_money(unhedged_dv01), key="DV01")
+    metric_with_help(c4, "Hedged parallel DV01", format_money(hedged_dv01), key="DV01")
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Unhedged eff. duration", f"{unhedged_duration:.2f}")
-    c2.metric("Hedged eff. duration", f"{hedged_duration:.2f}")
-    c3.metric("Unhedged convexity", f"{unhedged_convexity:.2f}")
-    c4.metric("Hedged convexity", f"{hedged_convexity:.2f}")
+    metric_with_help(c1, "Unhedged eff. duration", f"{unhedged_duration:.2f}", key="Effective duration")
+    metric_with_help(c2, "Hedged eff. duration", f"{hedged_duration:.2f}", key="Effective duration")
+    metric_with_help(c3, "Unhedged convexity", f"{unhedged_convexity:.2f}", key="Convexity")
+    metric_with_help(c4, "Hedged convexity", f"{hedged_convexity:.2f}", key="Convexity")
 
     unhedged_ladder = make_delta_ladder(portfolio, rates_data, curve_as_of_date)
     hedged_ladder = make_delta_ladder(hedged_portfolio, rates_data, curve_as_of_date)
@@ -597,18 +710,26 @@ with tabs[2]:
 
     st.subheader("Risk Concentration")
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Unhedged top KRD bucket", format_tenor(unhedged_concentration["largest_bucket"]))
-    c2.metric("Unhedged top KRD share", f"{unhedged_concentration['share_total_abs_krd']:.2%}")
-    c3.metric("Hedged top KRD bucket", format_tenor(hedged_concentration["largest_bucket"]))
-    c4.metric("Hedged top KRD share", f"{hedged_concentration['share_total_abs_krd']:.2%}")
+    metric_with_help(c1, "Unhedged top KRD bucket", format_tenor(unhedged_concentration["largest_bucket"]), key="Largest KRD bucket")
+    metric_with_help(c2, "Unhedged top KRD share", f"{unhedged_concentration['share_total_abs_krd']:.2%}", key="Largest KRD share")
+    metric_with_help(c3, "Hedged top KRD bucket", format_tenor(hedged_concentration["largest_bucket"]), key="Largest KRD bucket")
+    metric_with_help(c4, "Hedged top KRD share", f"{hedged_concentration['share_total_abs_krd']:.2%}", key="Largest KRD share")
 
     ladder_df = pd.DataFrame({
-        "tenor": rates_data.tenors,
-        "unhedged_key_rate_dv01": unhedged_ladder,
-        "hedged_key_rate_dv01": hedged_ladder,
+        "Tenor": [format_tenor(x) for x in rates_data.tenors],
+        "Unhedged Key-Rate DV01": unhedged_ladder,
+        "Hedged Key-Rate DV01": hedged_ladder,
     })
-    st.dataframe(ladder_df, use_container_width=True)
-    st.bar_chart(ladder_df.set_index("tenor"))
+    st.dataframe(
+        ladder_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Unhedged Key-Rate DV01": st.column_config.NumberColumn("Unhedged Key-Rate DV01", format="$%.0f"),
+            "Hedged Key-Rate DV01": st.column_config.NumberColumn("Hedged Key-Rate DV01", format="$%.0f"),
+        },
+    )
+    st.bar_chart(ladder_df.set_index("Tenor"))
     st.write("Clean / dirty valuation")
     st.dataframe(
         pd.DataFrame(
@@ -618,23 +739,50 @@ with tabs[2]:
             ]
         ),
         use_container_width=True,
+        hide_index=True,
+        column_config={
+            "portfolio": st.column_config.TextColumn("Portfolio"),
+            "clean_value": st.column_config.NumberColumn("Clean Value", format="$%.0f"),
+            "dirty_value": st.column_config.NumberColumn("Dirty Value", format="$%.0f"),
+            "accrued_interest": st.column_config.NumberColumn("Accrued Interest", format="$%.0f"),
+        },
     )
 
 with tabs[3]:
     st.subheader("Rolling PCA Hedge Backtest")
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Avg abs P&L reduction", f"{summary['gross_avg_abs_pnl_reduction_pct']:.2%}")
-    c2.metric("Net vol reduction", f"{summary['net_pnl_vol_reduction_pct']:.2%}")
-    c3.metric("Net hit rate", f"{summary['net_hit_rate']:.2%}")
+    metric_with_help(c1, "Avg abs P&L reduction", f"{summary['gross_avg_abs_pnl_reduction_pct']:.2%}", key="Gross P&L reduction")
+    metric_with_help(c2, "Net vol reduction", f"{summary['net_pnl_vol_reduction_pct']:.2%}")
+    metric_with_help(c3, "Net hit rate", f"{summary['net_hit_rate']:.2%}")
     c4.metric("Total transaction cost", format_money(summary["total_transaction_cost"]))
     st.caption(
         "The backtest recalculates PCA hedge weights through time for the selected rolling window. Larger windows can "
         "be slow on Streamlit Cloud. If the hedge universe is maturity-mismatched, check the Portfolio tab's hedge "
         "suitability diagnostics before interpreting results."
     )
+    st.caption(
+        "Transaction costs use a bps-on-notional-change assumption: daily cost = |change in hedge notional| x cost bps / 10,000. "
+        "This is a configurable modeling assumption, not a universal execution-cost estimate."
+    )
     st.plotly_chart(backtest_figure(results_df, hedge_weight_cols), use_container_width=True)
     st.plotly_chart(transaction_cost_figure(results_df), use_container_width=True)
-    st.dataframe(summary.to_frame("value"), use_container_width=True)
+    st.write("Rolling Hedge Backtest - Summary")
+    st.dataframe(formatted_summary_table(summary), use_container_width=True, hide_index=True)
+    with st.expander("Rolling Hedge Backtest - Daily Detail"):
+        detail_df = results_df.reset_index().rename(columns={"index": "Date"})
+        st.dataframe(
+            detail_df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Date": st.column_config.DateColumn("Date", format="YYYY-MM-DD"),
+                "unhedged_pnl": st.column_config.NumberColumn("Unhedged P&L", format="$%.0f"),
+                "hedged_pnl": st.column_config.NumberColumn("Gross Hedged P&L", format="$%.0f"),
+                "net_hedged_pnl": st.column_config.NumberColumn("Net Hedged P&L", format="$%.0f"),
+                "transaction_cost": st.column_config.NumberColumn("Transaction Cost", format="$%.2f"),
+                "cum_transaction_cost": st.column_config.NumberColumn("Cumulative Transaction Cost", format="$%.0f"),
+            },
+        )
 
 with tabs[4]:
     st.subheader("Scenario Analysis")
@@ -666,7 +814,7 @@ with tabs[4]:
         all_scenarios,
         settlement_date=curve_as_of_date,
     )
-    st.dataframe(multi_scenarios, use_container_width=True)
+    st.dataframe(formatted_scenario_table(multi_scenarios), use_container_width=True, hide_index=True)
     st.bar_chart(multi_scenarios.set_index("scenario_name")[["unhedged_pnl", "hedged_pnl"]])
 
 with tabs[5]:
@@ -690,7 +838,7 @@ with tabs[5]:
         n_components=n_components,
     )
     st.write("Historical simulation VaR / ES")
-    st.dataframe(hist_var, use_container_width=True)
+    st.dataframe(formatted_var_table(hist_var), use_container_width=True, hide_index=True)
     st.write("Historical VaR Backtest")
     var_backtest = backtest_historical_var_table(results_df, alpha=alpha, lookback=int(lookback))
     if var_backtest.empty or var_backtest["days"].sum() == 0:
@@ -703,6 +851,7 @@ with tabs[5]:
         st.dataframe(
             var_backtest,
             use_container_width=True,
+            hide_index=True,
             column_config={
                 "expected_breaches": st.column_config.NumberColumn("expected_breaches", format="%.2f"),
                 "breach_rate": st.column_config.NumberColumn("breach_rate", format="%.2%"),
@@ -714,7 +863,7 @@ with tabs[5]:
             },
         )
     st.write("Parametric PCA VaR / ES")
-    st.dataframe(pd.DataFrame(param_var).T, use_container_width=True)
+    st.dataframe(formatted_parametric_var_table(param_var), use_container_width=True, hide_index=True)
 
 with tabs[6]:
     st.subheader("Latest One-Day PCA P&L Attribution")
@@ -725,6 +874,6 @@ with tabs[6]:
     hedged_attr = pca_pnl_attribution(hedged_portfolio, rates_data, date_t, date_t1, pca_for_attribution, n_components=3)
     c1, c2 = st.columns(2)
     c1.write("Unhedged")
-    c1.dataframe(unhedged_attr, use_container_width=True)
+    c1.dataframe(unhedged_attr, use_container_width=True, hide_index=True)
     c2.write("Hedged")
-    c2.dataframe(hedged_attr, use_container_width=True)
+    c2.dataframe(hedged_attr, use_container_width=True, hide_index=True)

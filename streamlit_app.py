@@ -329,10 +329,18 @@ with st.sidebar:
         max_backtest_days = st.number_input(
             "Rolling hedge backtest days",
             min_value=30,
-        max_value=1000,
-        value=60,
-        step=30,
+            max_value=1000,
+            value=60,
+            step=30,
             help="Caps the number of rolling hedge backtest observations. Lower values make public demos much faster.",
+        )
+        var_backtest_lookback = st.number_input(
+            "VaR backtest lookback days",
+            min_value=20,
+            max_value=500,
+            value=30,
+            step=10,
+            help="Rolling P&L window used only for the Kupiec VaR breach test. Keep it below the hedge backtest days to show results.",
         )
         ridge_lambda = st.number_input(
             "Hedge ridge regularization",
@@ -527,6 +535,7 @@ if run:
         "hedge_labels": hedge_labels,
         "hedge_weight_cols": hedge_weight_cols,
         "lookback": int(lookback),
+        "var_backtest_lookback": int(var_backtest_lookback),
         "alpha": alpha,
         "max_backtest_days": int(max_backtest_days),
         "curve_fit_method": curve_fit_method,
@@ -552,6 +561,7 @@ summary = state["summary"]
 hedge_labels = state["hedge_labels"]
 hedge_weight_cols = state["hedge_weight_cols"]
 lookback = state["lookback"]
+var_backtest_lookback = state["var_backtest_lookback"]
 alpha = state["alpha"]
 max_backtest_days = state["max_backtest_days"]
 curve_fit_method = state["curve_fit_method"]
@@ -896,13 +906,15 @@ with tabs[5]:
     st.write("Historical simulation VaR / ES")
     st.dataframe(formatted_var_table(hist_var), use_container_width=True, hide_index=True)
     st.write("Historical VaR Backtest")
-    var_backtest = backtest_historical_var_table(results_df, alpha=alpha, lookback=int(lookback))
+    var_backtest = backtest_historical_var_table(results_df, alpha=alpha, lookback=int(var_backtest_lookback))
     if var_backtest.empty or var_backtest["days"].sum() == 0:
-        st.info("Not enough backtest observations after the selected VaR lookback window.")
+        st.info("Not enough backtest observations after the selected VaR backtest lookback window.")
     else:
         st.caption(
             "Rolling historical VaR is computed from prior P&L observations and compared with the next realized daily loss. "
-            "Kupiec p-value tests unconditional coverage; low values suggest breach frequency differs from the target tail rate."
+            "Kupiec p-value tests unconditional coverage; low values suggest breach frequency differs from the target tail rate. "
+            f"The VaR/ES model lookback is {int(lookback)} days; this Kupiec panel uses a shorter "
+            f"{int(var_backtest_lookback)}-day rolling P&L window so the public demo remains responsive."
         )
         st.dataframe(
             var_backtest,

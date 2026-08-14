@@ -184,6 +184,8 @@ The historical VaR backtest uses rolling historical P&L windows:
 
 This validates whether realized breach frequency is consistent with the target VaR tail probability.
 
+The app separates the VaR/ES model lookback from the VaR backtest lookback. The model can use a 252-day history for VaR/ES estimation, while the public demo can use a shorter rolling P&L window for the Kupiec panel so breach-test results remain visible even when the hedge backtest horizon is kept short for responsiveness.
+
 ## 13. P&L Attribution
 
 P&L attribution decomposes one-day portfolio P&L into PCA factor contributions and residual:

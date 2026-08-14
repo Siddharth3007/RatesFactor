@@ -749,6 +749,10 @@ with tabs[1]:
     if "NSS RMSE pct" in curve_diagnostics:
         fit_diagnostics.append({"Metric": "NSS RMSE (%)", "Value": f"{curve_diagnostics['NSS RMSE pct']:.4f}"})
     st.dataframe(pd.DataFrame(fit_diagnostics), use_container_width=True, hide_index=True)
+    st.caption(
+        "Tip: fitted forward turning points count how many times the fitted forward-rate curve changes direction. "
+        "A high count can indicate an overly wiggly curve fit rather than economically meaningful rate expectations."
+    )
     if zero_curve is not None:
         st.subheader("Bootstrapped Zero Curve")
         st.caption(

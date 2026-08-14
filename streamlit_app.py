@@ -608,7 +608,7 @@ col4.metric("Hedge instruments", len(hedge_instruments))
 st.caption(f"Pricing curve source: {pricing_curve_label}")
 st.caption(
     f"Rolling PCA hedge backtest observations: latest {int(max_backtest_days)} days; "
-    f"PCA hedge weights are rebalanced every {int(pca_stride)} day(s)."
+    "PCA hedge weights are rebalanced after a fixed number of days set by the rebalance stride."
 )
 
 if hedge_diag["severity"] == "Warning":
@@ -858,7 +858,7 @@ with tabs[3]:
     c4.metric("Total transaction cost", format_money(summary["total_transaction_cost"]))
     st.caption(
         "The backtest replays daily P&L through the selected rolling hedge window. PCA hedge weights are recalculated "
-        f"every {int(pca_stride)} day(s) and held between rebalances. If the hedge universe is maturity-mismatched, "
+        "after a fixed number of days determined by the rebalance stride and held between rebalances. If the hedge universe is maturity-mismatched, "
         "check the Portfolio tab's hedge suitability diagnostics before interpreting results."
     )
     st.caption(
@@ -867,7 +867,7 @@ with tabs[3]:
     )
     st.plotly_chart(backtest_figure(results_df, hedge_weight_cols), use_container_width=True)
     st.caption(
-        f"PCA hedge weights are recalculated every {int(pca_stride)} day(s) and held constant between rebalances, "
+        "PCA hedge weights are recalculated after a fixed number of days determined by the rebalance stride and held constant between rebalances, "
         "so the hedge-weight lines are expected to look stepwise. Large jumps usually point to a changing PCA regime, "
         "an ill-conditioned hedge universe, or a ridge regularization setting that is too low for the selected instruments."
     )

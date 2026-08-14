@@ -338,6 +338,7 @@ with st.sidebar:
             "Long-duration: 2Y + 5Y + 10Y + 30Y",
             "Custom hedge template",
         ],
+        index=1,
     )
     hedge_file = None
     if hedge_universe_name == "Custom hedge template":

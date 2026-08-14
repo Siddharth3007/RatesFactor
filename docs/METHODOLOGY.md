@@ -185,3 +185,5 @@ P&L ≈ PC1 contribution + PC2 contribution + PC3 contribution + residual
 ```
 
 This helps distinguish level, slope, curvature, and non-factor-driven changes.
+
+The dashboard also compares the linearized attribution sum with full bond repricing for the latest one-day move. The difference is shown as a linearization error in dollars and as basis points of portfolio value, so the attribution output is treated as an approximation that can be checked rather than a black-box decomposition.

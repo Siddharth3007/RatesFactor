@@ -1,8 +1,8 @@
 # RatesFactor
 
-RatesFactor is a research-grade fixed-income risk analytics dashboard for Treasury portfolios. It converts a notebook prototype into a modular Python package and Streamlit app for portfolio ingestion, curve analytics, key-rate risk, PCA factor hedging, hedge backtesting, scenarios, VaR/ES, and P&L attribution.
+RatesFactor answers three practical Treasury risk questions: where does rate exposure live on the curve, does a PCA hedge actually reduce that exposure, and does the hedge still look reasonable after transaction costs, VaR checks, and a mismatched hedge universe.
 
-The project is designed as a realistic rates risk prototype, not a production pricing system. The main focus is the risk workflow: where curve exposure sits, how a PCA hedge behaves, and when a hedge universe is unsuitable.
+It is a research-grade fixed-income risk analytics dashboard, not a production pricing system. The focus is the risk workflow: key-rate exposure, PCA factor hedging, hedge stability, scenario/VaR behavior, and transparent model limitations.
 
 ## Highlights
 
@@ -19,6 +19,7 @@ The project is designed as a realistic rates risk prototype, not a production pr
 - Historical VaR backtesting with breach counts, breach rates, Kupiec LR statistic, and p-value.
 - 21 rate shock scenarios, including Basel/IRRBB-style USD shocks.
 - PCA P&L attribution across PC1, PC2, PC3, and residual.
+- Visible validation artifacts: linearized-vs-full-reprice attribution error, pricing caveats, and lightweight unit tests.
 
 ## Dashboard
 
@@ -109,6 +110,23 @@ RatesFactor focuses on Treasury curve risk:
 - Transaction-cost-aware backtesting.
 
 The pricing engine is intentionally simplified compared with institutional systems. FRED mode prices from fitted Treasury curve rates; the bootstrapped modes demonstrate curve construction from a template universe but are still research-grade, not a full production Treasury curve build.
+
+In the bundled demo curve-construction universe, comparing fitted/par-yield proxy pricing with the bootstrapped curve gives an average absolute difference of about **$2.07 per $100 face** across the toy 2Y/5Y/10Y/30Y bonds, with the largest difference about **$5.60 per $100 face** on the 30Y bond. This is a demo-universe sensitivity check, not a universal pricing-error estimate.
+
+## Validation
+
+The repo includes lightweight tests for:
+
+- Flat-curve/par-ish bond pricing.
+- Accrued interest between coupon dates.
+- Positive DV01 sign for long fixed-rate Treasury-like bonds.
+- The demo pricing-error comparison helper.
+
+Run locally:
+
+```bash
+pytest -q
+```
 
 ## Documentation
 

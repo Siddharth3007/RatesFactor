@@ -43,6 +43,7 @@ from ratesfactor.templates import (
     standard_holdings_template,
     tlt_holdings_template,
 )
+from ratesfactor.validation import demo_pricing_error_summary
 from ratesfactor.var import backtest_historical_var_table, compute_historical_var, compute_parametric_var
 from ratesfactor.zerocurve import bootstrap_zero_curve, load_curve_universe, zero_curve_to_rate_curve
 
@@ -174,6 +175,32 @@ def formatted_parametric_var_table(param_var):
     if "confidence_level" in display_df:
         display_df["confidence_level"] = display_df["confidence_level"].map(lambda x: f"{float(x):.2%}")
     return display_df
+
+
+def formatted_attribution_table(df):
+    display_df = df.copy()
+    display_df["pnl"] = display_df["pnl"].map(format_money)
+    return display_df.rename(columns={"component": "Component", "pnl": "P&L"})
+
+
+def linearization_validation_table(unhedged_attr, hedged_attr, unhedged_value, hedged_value):
+    rows = []
+    for label, attr, value in [
+        ("Unhedged", unhedged_attr, unhedged_value),
+        ("Hedged", hedged_attr, hedged_value),
+    ]:
+        total_linearized = float(attr.loc[attr["component"] == "total_linearized", "pnl"].iloc[0])
+        full_reprice = float(attr.loc[attr["component"] == "full_reprice", "pnl"].iloc[0])
+        error = float(attr.loc[attr["component"] == "linearization_error", "pnl"].iloc[0])
+        error_bp = np.nan if value == 0 else abs(error) / abs(value) * 10_000
+        rows.append({
+            "Portfolio": label,
+            "Linearized P&L": total_linearized,
+            "Full Reprice P&L": full_reprice,
+            "Linearization Error": error,
+            "Error (bp of value)": error_bp,
+        })
+    return pd.DataFrame(rows)
 
 
 def line_item_display_table(line_item_df):
@@ -556,11 +583,42 @@ with tabs[0]:
     metric_with_help(c1, "Weighted avg maturity", f"{portfolio_stats['weighted_avg_maturity']:.2f}Y")
     metric_with_help(c2, "Weighted avg coupon", f"{portfolio_stats['weighted_avg_coupon']:.2%}")
     metric_with_help(c3, "Market / dirty value", format_money(portfolio_values["dirty_value"]))
+    st.caption(
+        "Pricing caveat: FRED mode discounts off fitted CMT yields, not a fully bootstrapped market zero curve. "
+        "Bootstrapped modes are available as a demo/user-uploaded curve-construction workflow; see Assumptions & Limitations."
+    )
     st.dataframe(
         line_item_display_table(line_item_df),
         use_container_width=True,
         hide_index=True,
     )
+    with st.expander("Demo pricing sensitivity: fitted/par-yield proxy vs bootstrapped curve"):
+        pricing_error = demo_pricing_error_summary()
+        st.caption(
+            "Bundled demo universe only: on the toy bonds, the largest price difference is "
+            f"${pricing_error['max_abs_price_delta']:.2f} per $100 face and the average absolute difference is "
+            f"${pricing_error['avg_abs_price_delta']:.2f} per $100 face."
+        )
+        display_error = pricing_error["comparison_table"].rename(
+            columns={
+                "bond": "Bond",
+                "maturity": "Maturity",
+                "par_proxy_price": "Fitted/Par Proxy Price",
+                "bootstrap_price": "Bootstrapped Price",
+                "price_delta": "Price Delta",
+            }
+        )
+        st.dataframe(
+            display_error,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Maturity": st.column_config.NumberColumn("Maturity", format="%.2fY"),
+                "Fitted/Par Proxy Price": st.column_config.NumberColumn("Fitted/Par Proxy Price", format="$%.2f"),
+                "Bootstrapped Price": st.column_config.NumberColumn("Bootstrapped Price", format="$%.2f"),
+                "Price Delta": st.column_config.NumberColumn("Price Delta", format="$%.2f"),
+            },
+        )
     with st.expander("Raw portfolio inputs"):
         st.dataframe(portfolio, use_container_width=True, hide_index=True)
     st.subheader("Hedge Instruments")
@@ -750,6 +808,12 @@ with tabs[2]:
 
 with tabs[3]:
     st.subheader("Rolling PCA Hedge Backtest")
+    st.info(
+        "How to read this: strong hedge effectiveness is most believable when the hedge universe spans the portfolio's "
+        "key-rate exposure and transaction costs remain small. Very high effectiveness can be a toy/demo artifact if "
+        "the hedge instruments overlap closely with the portfolio tenors; weak or sign-flipped results usually point "
+        "to hedge-universe mismatch, unstable weights, or residual factor exposure."
+    )
     c1, c2, c3, c4 = st.columns(4)
     metric_with_help(c1, "Avg abs P&L reduction", f"{summary['gross_avg_abs_pnl_reduction_pct']:.2%}", key="Gross P&L reduction")
     metric_with_help(c2, "Net vol reduction", f"{summary['net_pnl_vol_reduction_pct']:.2%}")
@@ -819,6 +883,11 @@ with tabs[4]:
 
 with tabs[5]:
     st.subheader("VaR / Expected Shortfall")
+    st.info(
+        "How to read this: Historical VaR replays realized curve shocks, while parametric PCA VaR assumes normal factor "
+        "moves. A reasonable VaR backtest should have breach frequency close to the selected tail rate; a low Kupiec "
+        "p-value suggests the breach rate is inconsistent with the target VaR level."
+    )
     hist_var = compute_historical_var(
         portfolio,
         hedge_instruments,
@@ -872,8 +941,38 @@ with tabs[6]:
     pca_for_attribution = latest_pca
     unhedged_attr = pca_pnl_attribution(portfolio, rates_data, date_t, date_t1, pca_for_attribution, n_components=3)
     hedged_attr = pca_pnl_attribution(hedged_portfolio, rates_data, date_t, date_t1, pca_for_attribution, n_components=3)
+    unhedged_value_latest = portfolio_value(portfolio, rates_data.get_curve(date_t, "decimal"), settlement_date=date_t)
+    hedged_value_latest = portfolio_value(hedged_portfolio, rates_data.get_curve(date_t, "decimal"), settlement_date=date_t)
+    validation_df = linearization_validation_table(
+        unhedged_attr,
+        hedged_attr,
+        unhedged_value_latest,
+        hedged_value_latest,
+    )
+    st.caption(
+        "Validation artifact: PCA attribution is a linearized P&L approximation. The table below compares the "
+        "linearized attribution sum with full bond repricing for the latest one-day move."
+    )
+    v1, v2, v3 = st.columns(3)
+    avg_error_bp = validation_df["Error (bp of value)"].mean()
+    max_abs_error = validation_df["Linearization Error"].abs().max()
+    v1.metric("Avg linearization error", f"{avg_error_bp:.2f} bp", help="Average absolute attribution error as bp of portfolio value.")
+    v2.metric("Max error ($)", format_money(max_abs_error), help="Largest absolute difference between linearized P&L and full-reprice P&L.")
+    v3.metric("Attribution date", f"{date_t.date()} to {date_t1.date()}")
+    st.dataframe(
+        validation_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Linearized P&L": st.column_config.NumberColumn("Linearized P&L", format="$%.0f"),
+            "Full Reprice P&L": st.column_config.NumberColumn("Full Reprice P&L", format="$%.0f"),
+            "Linearization Error": st.column_config.NumberColumn("Linearization Error", format="$%.0f"),
+            "Error (bp of value)": st.column_config.NumberColumn("Error (bp of value)", format="%.2f"),
+        },
+    )
+    st.bar_chart(validation_df.set_index("Portfolio")[["Linearized P&L", "Full Reprice P&L"]])
     c1, c2 = st.columns(2)
     c1.write("Unhedged")
-    c1.dataframe(unhedged_attr, use_container_width=True, hide_index=True)
+    c1.dataframe(formatted_attribution_table(unhedged_attr), use_container_width=True, hide_index=True)
     c2.write("Hedged")
-    c2.dataframe(hedged_attr, use_container_width=True, hide_index=True)
+    c2.dataframe(formatted_attribution_table(hedged_attr), use_container_width=True, hide_index=True)

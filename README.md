@@ -23,6 +23,10 @@ It is a research-grade fixed-income risk analytics dashboard, not a production p
 - PCA P&L attribution across PC1, PC2, PC3, and residual.
 - Visible validation artifacts: linearized-vs-full-reprice attribution error, pricing caveats, and lightweight unit tests.
 
+## Development Note
+
+The core analytics code was written by me, including the bond pricer, portfolio data readers, FRED data pull, yield-curve fitting, zero-curve bootstrapper, PCA engine, hedge construction, hedge backtests, VaR/ES, VaR backtesting, and P&L attribution. I used Claude as an engineering assistant for the Streamlit app layer and visualization code. The dashboard design, UI decisions, feature choices, and implementation direction were still mine; the AI assistance was used to speed up presentation, wiring, and deployment work around the fixed-income engine.
+
 ## Dashboard
 
 Run the Streamlit app locally:

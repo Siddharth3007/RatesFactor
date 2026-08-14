@@ -141,6 +141,7 @@ pytest -q
 - [Design Decisions](docs/DESIGN_DECISIONS.md)
 - [Future Scope](docs/FUTURE_SCOPE.md)
 - [Proof of Work](docs/PROOF_OF_WORK.md)
+- [Credits and References](docs/CREDITS_AND_REFERENCES.md)
 
 ## Status
 

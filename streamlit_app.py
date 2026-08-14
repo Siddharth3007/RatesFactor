@@ -267,7 +267,7 @@ def line_item_display_table(line_item_df):
 def choose_hedge_universe(name, settlement_date, day_count):
     if name == "Front-end: 6M + 2Y":
         return front_end_hedge_instruments(settlement_date, day_count), np.array([0.20, 0.25]), 2
-    if name == "Mild mismatch: 5Y + 10Y + 20Y":
+    if name == "Middle-end: 3Y + 7Y + 20Y":
         return mild_mismatch_hedge_instruments(settlement_date, day_count), np.array([0.35, 0.45, 0.65]), 3
     return long_duration_hedge_instruments(settlement_date, day_count), np.array([0.25, 0.35, 0.50, 0.75]), 3
 
@@ -312,7 +312,7 @@ with st.sidebar:
         "Hedge universe",
         [
             "Front-end: 6M + 2Y",
-            "Mild mismatch: 5Y + 10Y + 20Y",
+            "Middle-end: 3Y + 7Y + 20Y",
             "Long-duration: 2Y + 5Y + 10Y + 30Y",
             "Custom hedge template",
         ],
@@ -329,9 +329,9 @@ with st.sidebar:
         max_backtest_days = st.number_input(
             "Rolling hedge backtest days",
             min_value=30,
-            max_value=1000,
-            value=120,
-            step=30,
+        max_value=1000,
+        value=60,
+        step=30,
             help="Caps the number of rolling hedge backtest observations. Lower values make public demos much faster.",
         )
         ridge_lambda = st.number_input(

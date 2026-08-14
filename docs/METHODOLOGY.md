@@ -125,7 +125,7 @@ Large hedge notionals, negative hedged market value, or sign-flipped hedged P&L 
 The built-in hedge universes intentionally include different levels of suitability:
 
 - `Front-end: 6M + 2Y`: deliberately mismatched for long-duration books.
-- `Mild mismatch: 5Y + 10Y + 20Y`: demo-friendly middle case with reasonable duration coverage but imperfect 2Y/30Y key-rate coverage.
+- `Middle-end: 3Y + 7Y + 20Y`: demo-friendly middle case with some curve coverage but imperfect 2Y/5Y/10Y/30Y key-rate overlap.
 - `Long-duration: 2Y + 5Y + 10Y + 30Y`: close coverage for the default toy portfolio.
 
 ## 9. Hedge Backtest
@@ -138,6 +138,8 @@ The rolling hedge backtest:
 4. Computes unhedged P&L, gross hedged P&L, net hedged P&L, and transaction costs.
 
 Summary statistics include average absolute P&L reduction, volatility reduction, hit rate, and total transaction costs.
+
+The public demo defaults to a shorter 60-day hedge backtest window to keep the hosted app responsive. A future performance enhancement would be stride-based rebalancing, where hedge weights are recomputed every N days and held between rebalance dates.
 
 ## 10. Scenario Analysis
 

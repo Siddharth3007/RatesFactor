@@ -75,10 +75,10 @@ def long_duration_hedge_instruments(settlement_date=None, day_count="ACT/ACT"):
 def mild_mismatch_hedge_instruments(settlement_date=None, day_count="ACT/ACT"):
     settlement_date = pd.Timestamp(settlement_date)
     hedges = pd.DataFrame({
-        "bond": ["5Y Hedge Note", "10Y Hedge Note", "20Y Hedge Bond"],
+        "bond": ["3Y Hedge Note", "7Y Hedge Note", "20Y Hedge Bond"],
         "face_value": [1_000_000, 1_000_000, 1_000_000],
         "coupon": [0.04, 0.04, 0.04],
-        "maturity": [5, 10, 20],
+        "maturity": [3, 7, 20],
         "frequency": [2, 2, 2],
         "positions": [1, 1, 1],
     })

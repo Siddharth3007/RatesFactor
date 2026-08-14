@@ -72,6 +72,19 @@ def long_duration_hedge_instruments(settlement_date=None, day_count="ACT/ACT"):
     return _with_pricing_conventions(hedges, settlement_date, day_count)
 
 
+def mild_mismatch_hedge_instruments(settlement_date=None, day_count="ACT/ACT"):
+    settlement_date = pd.Timestamp(settlement_date)
+    hedges = pd.DataFrame({
+        "bond": ["5Y Hedge Note", "10Y Hedge Note", "20Y Hedge Bond"],
+        "face_value": [1_000_000, 1_000_000, 1_000_000],
+        "coupon": [0.04, 0.04, 0.04],
+        "maturity": [5, 10, 20],
+        "frequency": [2, 2, 2],
+        "positions": [1, 1, 1],
+    })
+    return _with_pricing_conventions(hedges, settlement_date, day_count)
+
+
 def load_tlt_holdings_csv(path_or_buffer, as_of_date, target_notional=10_000_000, day_count="ACT/ACT"):
     try:
         raw = pd.read_csv(path_or_buffer, skiprows=9)

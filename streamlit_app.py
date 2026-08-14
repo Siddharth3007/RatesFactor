@@ -22,6 +22,7 @@ from ratesfactor.portfolio import (
     load_custom_hedge_instruments,
     load_portfolio,
     long_duration_hedge_instruments,
+    mild_mismatch_hedge_instruments,
     portfolio_summary_stats,
 )
 from ratesfactor.pca import fit_pca, fit_rolling_pca
@@ -266,6 +267,8 @@ def line_item_display_table(line_item_df):
 def choose_hedge_universe(name, settlement_date, day_count):
     if name == "Front-end: 6M + 2Y":
         return front_end_hedge_instruments(settlement_date, day_count), np.array([0.20, 0.25]), 2
+    if name == "Mild mismatch: 5Y + 10Y + 20Y":
+        return mild_mismatch_hedge_instruments(settlement_date, day_count), np.array([0.35, 0.45, 0.65]), 3
     return long_duration_hedge_instruments(settlement_date, day_count), np.array([0.25, 0.35, 0.50, 0.75]), 3
 
 
@@ -307,7 +310,12 @@ with st.sidebar:
 
     hedge_universe_name = st.selectbox(
         "Hedge universe",
-        ["Front-end: 6M + 2Y", "Long-duration: 2Y + 5Y + 10Y + 30Y", "Custom hedge template"],
+        [
+            "Front-end: 6M + 2Y",
+            "Mild mismatch: 5Y + 10Y + 20Y",
+            "Long-duration: 2Y + 5Y + 10Y + 30Y",
+            "Custom hedge template",
+        ],
     )
     hedge_file = None
     if hedge_universe_name == "Custom hedge template":

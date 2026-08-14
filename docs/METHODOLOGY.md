@@ -122,6 +122,12 @@ The app reports diagnostics to prevent blind interpretation of hedge outputs:
 
 Large hedge notionals, negative hedged market value, or sign-flipped hedged P&L may occur when the hedge universe does not cover the portfolio key-rate exposure.
 
+The built-in hedge universes intentionally include different levels of suitability:
+
+- `Front-end: 6M + 2Y`: deliberately mismatched for long-duration books.
+- `Mild mismatch: 5Y + 10Y + 20Y`: demo-friendly middle case with reasonable duration coverage but imperfect 2Y/30Y key-rate coverage.
+- `Long-duration: 2Y + 5Y + 10Y + 30Y`: close coverage for the default toy portfolio.
+
 ## 9. Hedge Backtest
 
 The rolling hedge backtest:

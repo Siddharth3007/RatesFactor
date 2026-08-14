@@ -21,6 +21,14 @@ RatesFactor is a research-grade fixed-income risk prototype. It is intended to d
 
 The largest methodological limitation is that the current pricing engine discounts cash flows using fitted Treasury curve rates rather than a fully bootstrapped zero/discount curve.
 
+When rates are used directly for bond cash-flow discounting, the app assumes periodic compounding based on the instrument coupon frequency:
+
+```text
+DF(t) = 1 / (1 + r / frequency)^(frequency * t)
+```
+
+For bootstrapped curve modes, discount factors are solved directly from dirty prices and used as discount factors. Any continuously-compounded zero-rate display derived from those discount factors is a reporting/curve-display convention, not the cash-flow discounting convention.
+
 In production fixed-income pricing, cash flows should generally be discounted using zero rates or discount factors built from market instruments. Using fitted par/constant-maturity yields introduces approximation error into:
 
 - Dirty value.

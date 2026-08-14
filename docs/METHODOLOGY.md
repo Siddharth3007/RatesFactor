@@ -58,6 +58,14 @@ The pricing engine generates future coupon cash flows from maturity date, settle
 
 The dashboard supports ACT/ACT, ACT/365.25, ACT/365, and ACT/360 year fractions. Treasury-style semiannual coupons are supported through the `frequency` input.
 
+When a rate is used directly to discount a bond cash flow, the app uses periodic compounding based on the instrument coupon frequency:
+
+```text
+DF(t) = 1 / (1 + r / frequency)^(frequency * t)
+```
+
+For bootstrapped curve modes, the bootstrap solves discount factors directly from dirty prices. Those discount factors are used for pricing; any zero-rate view derived from them is a display convention.
+
 Current limitation: the FRED mode discounts from fitted Treasury curve rates rather than instrument-level market quotes. The bootstrapped modes demonstrate zero-curve construction, but the app remains a research-grade risk prototype rather than an institutional pricing system.
 
 ## 5. DV01 and Key-Rate DV01
@@ -133,13 +141,13 @@ The built-in hedge universes intentionally include different levels of suitabili
 The rolling hedge backtest:
 
 1. Uses rolling PCA windows.
-2. Recomputes hedge weights through time.
+2. Recomputes hedge weights after a fixed number of days determined by the rebalance stride.
 3. Applies realized daily curve shocks.
 4. Computes unhedged P&L, gross hedged P&L, net hedged P&L, and transaction costs.
 
 Summary statistics include average absolute P&L reduction, volatility reduction, hit rate, and total transaction costs.
 
-The public demo defaults to a shorter 60-day hedge backtest window to keep the hosted app responsive. A future performance enhancement would be stride-based rebalancing, where hedge weights are recomputed every N days and held between rebalance dates.
+The public demo uses stride-based rebalancing: hedge weights are recomputed every N days and held between rebalance dates. This keeps the backtest responsive while still showing rolling hedge behavior over a longer sample.
 
 ## 10. Scenario Analysis
 

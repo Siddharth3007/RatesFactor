@@ -119,7 +119,11 @@ RatesFactor focuses on Treasury curve risk:
 - Scenario shocks and VaR/ES.
 - Transaction-cost-aware backtesting.
 
-The pricing engine is intentionally simplified compared with institutional systems. FRED mode prices from fitted Treasury curve rates; the bootstrapped modes demonstrate curve construction from a template universe but are still research-grade, not a full production Treasury curve build.
+The pricing engine is intentionally simplified compared with institutional systems. FRED mode prices from fitted Treasury curve rates; the bootstrapped modes demonstrate curve construction from a template universe but are still research-grade, not a full production Treasury curve build. When rates are used directly for bond cash-flow discounting, the app uses periodic compounding based on the instrument coupon frequency:
+
+```text
+DF(t) = 1 / (1 + r / frequency)^(frequency * t)
+```
 
 In the bundled demo curve-construction universe, comparing fitted/par-yield proxy pricing with the bootstrapped curve gives an average absolute difference of about **$2.07 per $100 face** across the toy 2Y/5Y/10Y/30Y bonds, with the largest difference about **$5.60 per $100 face** on the 30Y bond. This is a demo-universe sensitivity check, not a universal pricing-error estimate.
 

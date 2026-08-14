@@ -39,6 +39,8 @@ Included notebooks:
 - [treasury-curve-toy-v2.ipynb](proof-of-work/prototype-notebooks/treasury-curve-toy-v2.ipynb): expanded prototype with multi-scenario analysis, historical simulation VaR, parametric PCA VaR, and holdings ingestion experiments.
 - [treasury-curve-toy-clean.ipynb](proof-of-work/prototype-notebooks/treasury-curve-toy-clean.ipynb): cleaned notebook used as the direct source for modularizing the dashboard.
 - [spline-forward-rate-diagnostics.ipynb](proof-of-work/prototype-notebooks/spline-forward-rate-diagnostics.ipynb): diagnostics around spline curve fitting and forward-rate behavior.
+- [bootstrap.ipynb](proof-of-work/prototype-notebooks/bootstrap.ipynb): exploratory zero-curve bootstrap prototype using a curve construction universe, dirty prices, coupon cashflows, year fractions, and log discount-factor interpolation.
+- [hedge-validation.ipynb](proof-of-work/prototype-notebooks/hedge-validation.ipynb): hedge validation notebook used to test PCA hedge behavior, rolling hedge weights, and backtest diagnostics before dashboard integration.
 
 Note: these notebooks are not the maintained implementation. They are included to show the project development path and may contain exploratory code, intermediate outputs, and older assumptions. Secrets and local file paths have been replaced with placeholders.
 

@@ -270,8 +270,10 @@ run_disabled = (
     or (curve_source == "uploaded_bootstrap" and curve_universe_file is None)
 )
 run = st.sidebar.button("Run RatesFactor", type="primary", disabled=run_disabled)
+if "run_state" in st.session_state and not run:
+    st.sidebar.caption("Showing the last completed run. Click Run RatesFactor to refresh after changing inputs.")
 
-if not run:
+if (not run) and ("run_state" not in st.session_state):
     st.info("Choose inputs in the sidebar and click Run RatesFactor.")
     if not api_key:
         st.warning("A FRED API key is required to fetch Treasury curve history.")
@@ -284,104 +286,155 @@ if not run:
     st.stop()
 
 
-holdings_as_of_ts = pd.Timestamp(holdings_as_of_date)
-start_date = holdings_as_of_ts - pd.DateOffset(years=history_years)
-end_date = holdings_as_of_ts
+if run:
+    holdings_as_of_ts = pd.Timestamp(holdings_as_of_date)
+    start_date = holdings_as_of_ts - pd.DateOffset(years=history_years)
+    end_date = holdings_as_of_ts
 
-with st.spinner("Loading portfolio and Treasury curve history..."):
-    _, portfolio = load_portfolio(
-        source_type,
-        path_or_buffer=uploaded_file,
-        as_of_date=holdings_as_of_ts,
-        target_notional=target_notional,
-        day_count=day_count,
-    )
-    rates_pct = cached_fetch_rates(api_key, start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
-    rates_data = RatesData(rates_pct)
+    with st.spinner("Loading portfolio and Treasury curve history..."):
+        _, portfolio = load_portfolio(
+            source_type,
+            path_or_buffer=uploaded_file,
+            as_of_date=holdings_as_of_ts,
+            target_notional=target_notional,
+            day_count=day_count,
+        )
+        rates_pct = cached_fetch_rates(api_key, start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
+        rates_data = RatesData(rates_pct)
 
-curve_as_of_date = pd.Timestamp(rates_data.latest_date)
-base_curve = rates_data.get_curve(curve_as_of_date, units="decimal")
-zero_curve = None
-curve_universe = None
-pricing_curve_label = "FRED fitted Treasury curve"
+    curve_as_of_date = pd.Timestamp(rates_data.latest_date)
+    base_curve = rates_data.get_curve(curve_as_of_date, units="decimal")
+    zero_curve = None
+    curve_universe = None
+    pricing_curve_label = "FRED fitted Treasury curve"
 
-with st.spinner("Preparing pricing curve..."):
-    if curve_source == "demo_bootstrap":
-        curve_universe = curve_construction_universe_template()
-        zero_curve = bootstrap_zero_curve(curve_universe)
-        pricing_curve_label = "Demo bootstrapped zero curve"
-    elif curve_source == "uploaded_bootstrap":
-        curve_universe = load_curve_universe(curve_universe_file)
-        zero_curve = bootstrap_zero_curve(curve_universe)
-        pricing_curve_label = "Uploaded bootstrapped zero curve"
+    with st.spinner("Preparing pricing curve..."):
+        if curve_source == "demo_bootstrap":
+            curve_universe = curve_construction_universe_template()
+            zero_curve = bootstrap_zero_curve(curve_universe)
+            pricing_curve_label = "Demo bootstrapped zero curve"
+        elif curve_source == "uploaded_bootstrap":
+            curve_universe = load_curve_universe(curve_universe_file)
+            zero_curve = bootstrap_zero_curve(curve_universe)
+            pricing_curve_label = "Uploaded bootstrapped zero curve"
 
-    if zero_curve is not None:
-        base_curve = zero_curve_to_rate_curve(zero_curve, rates_data.tenors)
-        base_curve.name = curve_as_of_date
-        rates_data.rates_decimal.loc[curve_as_of_date, rates_data.tenors] = base_curve.to_numpy(dtype=float)
-        rates_data.rates_pct.loc[curve_as_of_date, rates_data.tenors] = base_curve.to_numpy(dtype=float) * 100.0
+        if zero_curve is not None:
+            base_curve = zero_curve_to_rate_curve(zero_curve, rates_data.tenors)
+            base_curve.name = curve_as_of_date
+            rates_data.rates_decimal.loc[curve_as_of_date, rates_data.tenors] = base_curve.to_numpy(dtype=float)
+            rates_data.rates_pct.loc[curve_as_of_date, rates_data.tenors] = base_curve.to_numpy(dtype=float) * 100.0
 
-if hedge_universe_name == "Custom hedge template":
-    hedge_instruments, cost_bps = load_custom_hedge_instruments(
-        hedge_file,
-        settlement_date=holdings_as_of_ts,
-        day_count=day_count,
-    )
-    n_components = min(3, len(hedge_instruments))
-else:
-    hedge_instruments, cost_bps, n_components = choose_hedge_universe(
-        hedge_universe_name,
-        holdings_as_of_ts,
-        day_count,
-    )
-n_components = min(n_components, len(hedge_instruments), 3)
+    if hedge_universe_name == "Custom hedge template":
+        hedge_instruments, cost_bps = load_custom_hedge_instruments(
+            hedge_file,
+            settlement_date=holdings_as_of_ts,
+            day_count=day_count,
+        )
+        n_components = min(3, len(hedge_instruments))
+    else:
+        hedge_instruments, cost_bps, n_components = choose_hedge_universe(
+            hedge_universe_name,
+            holdings_as_of_ts,
+            day_count,
+        )
+    n_components = min(n_components, len(hedge_instruments), 3)
 
-with st.spinner("Running PCA, hedge construction, and risk analytics..."):
-    latest_pca = fit_pca(rates_data.daily_changes_bp.iloc[-int(lookback):], n_components=3)
-    static_pca = fit_pca(rates_data.daily_changes_bp, n_components=3)
+    with st.spinner("Running PCA, hedge construction, and risk analytics..."):
+        latest_pca = fit_pca(rates_data.daily_changes_bp.iloc[-int(lookback):], n_components=3)
+        static_pca = fit_pca(rates_data.daily_changes_bp, n_components=3)
 
-    hedge_weights = compute_pca_hedge_weights(
-        portfolio,
-        hedge_instruments,
-        rates_data,
-        curve_as_of_date,
-        latest_pca,
-        n_components=n_components,
-        ridge_lambda=ridge_lambda,
-    )
-    hedged_portfolio = build_hedged_portfolio(portfolio, hedge_instruments, hedge_weights)
-    hedge_diag = hedge_diagnostics(
-        portfolio,
-        hedge_instruments,
-        hedge_weights,
-        rates_data,
-        curve_as_of_date,
-        latest_pca,
-        n_components=n_components,
-    )
+        hedge_weights = compute_pca_hedge_weights(
+            portfolio,
+            hedge_instruments,
+            rates_data,
+            curve_as_of_date,
+            latest_pca,
+            n_components=n_components,
+            ridge_lambda=ridge_lambda,
+        )
+        hedged_portfolio = build_hedged_portfolio(portfolio, hedge_instruments, hedge_weights)
+        hedge_diag = hedge_diagnostics(
+            portfolio,
+            hedge_instruments,
+            hedge_weights,
+            rates_data,
+            curve_as_of_date,
+            latest_pca,
+            n_components=n_components,
+        )
 
-with st.spinner("Running hedge backtest and VaR validation inputs..."):
-    rolling_pca = fit_rolling_pca(
-        rates_data.daily_changes_bp,
-        lookback=int(lookback),
-        n_components=3,
-        max_windows=int(max_backtest_days) + 1,
-    )
-    backtest_results = run_pca_hedge_backtest(
-        portfolio,
-        hedge_instruments,
-        rates_data,
-        rolling_pca,
-        cost_bps,
-        lookback=int(lookback),
-        n_components=n_components,
-        ridge_lambda=ridge_lambda,
-        max_backtest_days=int(max_backtest_days),
-    )
-    results_df, summary, hedge_labels, hedge_weight_cols, _ = summarize_backtest_results(
-        backtest_results,
-        hedge_instruments,
-    )
+    with st.spinner("Running hedge backtest and VaR validation inputs..."):
+        rolling_pca = fit_rolling_pca(
+            rates_data.daily_changes_bp,
+            lookback=int(lookback),
+            n_components=3,
+            max_windows=int(max_backtest_days) + 1,
+        )
+        backtest_results = run_pca_hedge_backtest(
+            portfolio,
+            hedge_instruments,
+            rates_data,
+            rolling_pca,
+            cost_bps,
+            lookback=int(lookback),
+            n_components=n_components,
+            ridge_lambda=ridge_lambda,
+            max_backtest_days=int(max_backtest_days),
+        )
+        results_df, summary, hedge_labels, hedge_weight_cols, _ = summarize_backtest_results(
+            backtest_results,
+            hedge_instruments,
+        )
+
+    st.session_state.run_state = {
+        "portfolio": portfolio,
+        "rates_data": rates_data,
+        "curve_as_of_date": curve_as_of_date,
+        "base_curve": base_curve,
+        "zero_curve": zero_curve,
+        "curve_universe": curve_universe,
+        "pricing_curve_label": pricing_curve_label,
+        "hedge_instruments": hedge_instruments,
+        "cost_bps": cost_bps,
+        "n_components": n_components,
+        "latest_pca": latest_pca,
+        "static_pca": static_pca,
+        "hedge_weights": hedge_weights,
+        "hedged_portfolio": hedged_portfolio,
+        "hedge_diag": hedge_diag,
+        "results_df": results_df,
+        "summary": summary,
+        "hedge_labels": hedge_labels,
+        "hedge_weight_cols": hedge_weight_cols,
+        "lookback": int(lookback),
+        "alpha": alpha,
+        "max_backtest_days": int(max_backtest_days),
+        "curve_fit_method": curve_fit_method,
+    }
+
+state = st.session_state.run_state
+portfolio = state["portfolio"]
+rates_data = state["rates_data"]
+curve_as_of_date = state["curve_as_of_date"]
+base_curve = state["base_curve"]
+zero_curve = state["zero_curve"]
+curve_universe = state["curve_universe"]
+pricing_curve_label = state["pricing_curve_label"]
+hedge_instruments = state["hedge_instruments"]
+n_components = state["n_components"]
+latest_pca = state["latest_pca"]
+static_pca = state["static_pca"]
+hedge_weights = state["hedge_weights"]
+hedged_portfolio = state["hedged_portfolio"]
+hedge_diag = state["hedge_diag"]
+results_df = state["results_df"]
+summary = state["summary"]
+hedge_labels = state["hedge_labels"]
+hedge_weight_cols = state["hedge_weight_cols"]
+lookback = state["lookback"]
+alpha = state["alpha"]
+max_backtest_days = state["max_backtest_days"]
+curve_fit_method = state["curve_fit_method"]
 
 st.subheader("Run Context")
 col1, col2, col3, col4 = st.columns(4)

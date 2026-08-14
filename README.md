@@ -113,6 +113,12 @@ The pricing engine is intentionally simplified compared with institutional syste
 
 In the bundled demo curve-construction universe, comparing fitted/par-yield proxy pricing with the bootstrapped curve gives an average absolute difference of about **$2.07 per $100 face** across the toy 2Y/5Y/10Y/30Y bonds, with the largest difference about **$5.60 per $100 face** on the 30Y bond. This is a demo-universe sensitivity check, not a universal pricing-error estimate.
 
+How that comparison is constructed:
+
+- **Fitted/par-yield proxy price:** coupon bonds use their coupon rates as par-yield-style curve points; bills are converted into simple discount-implied rates. Those rates are interpolated across the toy bond maturities and used to discount the toy portfolio cash flows.
+- **Bootstrapped price:** the same curve-construction universe is bootstrapped into discount factors from dirty prices. Bills give direct discount factors; coupon bonds are solved in maturity order after discounting earlier coupons with already-known discount factors. Toy portfolio cash flows are then discounted from the resulting zero curve.
+- **Reported difference:** price per $100 face under the bootstrapped curve minus price per $100 face under the fitted/par-yield proxy curve.
+
 ## Validation
 
 The repo includes lightweight tests for:

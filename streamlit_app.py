@@ -43,7 +43,6 @@ from ratesfactor.templates import (
     standard_holdings_template,
     tlt_holdings_template,
 )
-from ratesfactor.validation import demo_pricing_error_summary
 from ratesfactor.var import backtest_historical_var_table, compute_historical_var, compute_parametric_var
 from ratesfactor.zerocurve import bootstrap_zero_curve, load_curve_universe, zero_curve_to_rate_curve
 
@@ -585,40 +584,14 @@ with tabs[0]:
     metric_with_help(c3, "Market / dirty value", format_money(portfolio_values["dirty_value"]))
     st.caption(
         "Pricing caveat: FRED mode discounts off fitted CMT yields, not a fully bootstrapped market zero curve. "
-        "Bootstrapped modes are available as a demo/user-uploaded curve-construction workflow; see Assumptions & Limitations."
+        "Bootstrapped modes are available as a demo/user-uploaded curve-construction workflow. A fitted/par-yield proxy "
+        "vs bootstrapped curve comparison is documented on GitHub in the README and Assumptions & Limitations."
     )
     st.dataframe(
         line_item_display_table(line_item_df),
         use_container_width=True,
         hide_index=True,
     )
-    with st.expander("Demo pricing sensitivity: fitted/par-yield proxy vs bootstrapped curve"):
-        pricing_error = demo_pricing_error_summary()
-        st.caption(
-            "Bundled demo universe only: on the toy bonds, the largest price difference is "
-            f"${pricing_error['max_abs_price_delta']:.2f} per $100 face and the average absolute difference is "
-            f"${pricing_error['avg_abs_price_delta']:.2f} per $100 face."
-        )
-        display_error = pricing_error["comparison_table"].rename(
-            columns={
-                "bond": "Bond",
-                "maturity": "Maturity",
-                "par_proxy_price": "Fitted/Par Proxy Price",
-                "bootstrap_price": "Bootstrapped Price",
-                "price_delta": "Price Delta",
-            }
-        )
-        st.dataframe(
-            display_error,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Maturity": st.column_config.NumberColumn("Maturity", format="%.2fY"),
-                "Fitted/Par Proxy Price": st.column_config.NumberColumn("Fitted/Par Proxy Price", format="$%.2f"),
-                "Bootstrapped Price": st.column_config.NumberColumn("Bootstrapped Price", format="$%.2f"),
-                "Price Delta": st.column_config.NumberColumn("Price Delta", format="$%.2f"),
-            },
-        )
     with st.expander("Raw portfolio inputs"):
         st.dataframe(portfolio, use_container_width=True, hide_index=True)
     st.subheader("Hedge Instruments")
@@ -687,31 +660,37 @@ with tabs[1]:
         "fit on the most recent PCA window and is what drives the current hedge, so it can differ when the recent "
         "rate regime differs from the full sample."
     )
-    d1, d2, d3, d4 = st.columns(4)
-    d1.metric(
-        "Latest rolling EV",
-        ", ".join(f"{x:.1%}" for x in latest_pca.explained_variance_ratio_[:3]),
-        help="Explained variance from the latest rolling PCA window used for current hedge construction.",
-    )
-    d2.metric(
-        "Static EV",
-        ", ".join(f"{x:.1%}" for x in static_pca.explained_variance_ratio_[:3]),
-        help="Explained variance from a PCA fit once on the full historical curve-change sample.",
-    )
-    d3.metric("Displayed fit", curve_fit_method)
-    d4.metric(
-        "Forward turning points",
-        curve_diagnostics["Fitted forward turning points"],
-        help=METRIC_HELP["Forward turning points"],
-    )
-    with st.expander("Curve diagnostics"):
-        st.dataframe(
-            pd.DataFrame(
-                [{"Metric": key, "Value": value} for key, value in curve_diagnostics.items()]
+    st.write("PCA explained variance")
+    explained_variance_df = pd.DataFrame({
+        "Component": [f"PC{i + 1}" for i in range(3)],
+        "Latest rolling explained variance": latest_pca.explained_variance_ratio_[:3] * 100,
+        "Static explained variance": static_pca.explained_variance_ratio_[:3] * 100,
+    })
+    st.dataframe(
+        explained_variance_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Latest rolling explained variance": st.column_config.NumberColumn(
+                "Latest rolling explained variance",
+                format="%.2f%%",
+                help="Explained variance from the latest rolling PCA window used for current hedge construction.",
             ),
-            use_container_width=True,
-            hide_index=True,
-        )
+            "Static explained variance": st.column_config.NumberColumn(
+                "Static explained variance",
+                format="%.2f%%",
+                help="Explained variance from a PCA fit once on the full historical curve-change sample.",
+            ),
+        },
+    )
+    st.write("Curve fit diagnostics")
+    fit_diagnostics = [
+        {"Metric": "Displayed curve fit", "Value": curve_fit_method},
+        {"Metric": "Fitted forward turning points", "Value": curve_diagnostics["Fitted forward turning points"]},
+    ]
+    if "NSS RMSE pct" in curve_diagnostics:
+        fit_diagnostics.append({"Metric": "NSS RMSE (%)", "Value": f"{curve_diagnostics['NSS RMSE pct']:.4f}"})
+    st.dataframe(pd.DataFrame(fit_diagnostics), use_container_width=True, hide_index=True)
     if zero_curve is not None:
         st.subheader("Bootstrapped Zero Curve")
         st.caption(

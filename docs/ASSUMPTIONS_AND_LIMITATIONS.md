@@ -35,6 +35,8 @@ This is the highest-priority future improvement.
 
 As a bounded demo sensitivity check, the bundled curve-construction universe compares fitted/par-yield proxy pricing with the bootstrapped zero-curve mode on the toy 2Y/5Y/10Y/30Y bonds. In that demo universe, the average absolute price difference is about **$2.07 per $100 face**, and the largest difference is about **$5.60 per $100 face** on the 30Y bond. This number is not a universal estimate; it is included to show the approximation can be measured rather than ignored.
 
+The fitted/par-yield proxy price is found by treating coupon rates as par-yield-style curve points for coupon bonds and converting bills into discount-implied rates. The bootstrapped price is found by solving discount factors from dirty prices in maturity order and then discounting the same toy bond cash flows from the resulting zero curve.
+
 ### Coupon Schedule Realism
 
 The app supports regular coupon schedules inferred by stepping backward from maturity date. It does not currently handle:

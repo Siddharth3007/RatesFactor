@@ -270,12 +270,14 @@ def bootstrap_zero_curve(curve_universe):
     return zero_curve
 
 
-def zero_curve_to_rate_curve(zero_curve, tenors):
+def zero_curve_to_rate_curve(zero_curve, tenors, frequency=2):
     tenors = np.asarray(tenors, dtype=float)
+    frequency = int(frequency)
     times = zero_curve["time_to_maturity"].to_numpy(dtype=float)
     log_dfs = np.log(zero_curve["discount_factor"].to_numpy(dtype=float))
     interp_log_dfs = np.interp(tenors, times, log_dfs)
-    zero_rates = -interp_log_dfs / tenors
+    discount_factors = np.exp(interp_log_dfs)
+    zero_rates = frequency * (np.power(discount_factors, -1 / (frequency * tenors)) - 1)
     return pd.Series(zero_rates, index=tenors)
 
 

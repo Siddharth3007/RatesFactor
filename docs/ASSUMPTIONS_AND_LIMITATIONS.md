@@ -5,7 +5,7 @@ RatesFactor is a research-grade fixed-income risk prototype. It is intended to d
 ## Main Assumptions
 
 - The risk universe is U.S. Treasury curve risk.
-- Treasury curve data comes from FRED constant-maturity Treasury series.
+- Treasury curve data comes from FRED constant-maturity Treasury series and is converted into proxy zero-rate history for the default workflow.
 - Portfolio instruments are treated as fixed-rate Treasury-like bonds.
 - Coupon schedules are inferred from maturity date and coupon frequency.
 - The default day-count convention is ACT/ACT.
@@ -19,7 +19,7 @@ RatesFactor is a research-grade fixed-income risk prototype. It is intended to d
 
 ### Pricing and Discounting
 
-The largest methodological limitation is that the current pricing engine discounts cash flows using fitted Treasury curve rates rather than a fully bootstrapped zero/discount curve.
+The largest methodological limitation is that the default FRED workflow bootstraps proxy zero rates from CMT/par-yield history rather than from CUSIP-level Treasury market prices.
 
 When rates are used directly for bond cash-flow discounting, the app assumes periodic compounding based on the instrument coupon frequency:
 
@@ -27,9 +27,9 @@ When rates are used directly for bond cash-flow discounting, the app assumes per
 DF(t) = 1 / (1 + r / frequency)^(frequency * t)
 ```
 
-For bootstrapped curve modes, discount factors are solved directly from dirty prices and used as discount factors. Any continuously-compounded zero-rate display derived from those discount factors is a reporting/curve-display convention, not the cash-flow discounting convention.
+For bootstrapped curve modes, discount factors are solved directly from dirty prices. Those discount factors are converted into periodic zero rates using the same compounding convention as the bond pricer.
 
-In production fixed-income pricing, cash flows should generally be discounted using zero rates or discount factors built from market instruments. Using fitted par/constant-maturity yields introduces approximation error into:
+In production fixed-income pricing, cash flows should generally be discounted using zero rates or discount factors built from market instruments. Using CMT/par-yield-implied proxy zero rates introduces approximation error into:
 
 - Dirty value.
 - Clean value.
@@ -41,7 +41,7 @@ In production fixed-income pricing, cash flows should generally be discounted us
 
 This is the highest-priority future improvement.
 
-As a bounded demo sensitivity check, the bundled curve-construction universe compares fitted/par-yield proxy pricing with the bootstrapped zero-curve mode on the toy 2Y/5Y/10Y/30Y bonds. In that demo universe, the average absolute price difference is about **$2.07 per $100 face**, and the largest difference is about **$5.60 per $100 face** on the 30Y bond. This number is not a universal estimate; it is included to show the approximation can be measured rather than ignored.
+As a bounded demo sensitivity check, the bundled curve-construction universe compares fitted/par-yield proxy pricing with the bootstrapped zero-curve mode on the toy 2Y/5Y/10Y/30Y bonds. In that demo universe, the average absolute price difference is about **$2.48 per $100 face**, and the largest difference is about **$6.54 per $100 face** on the 30Y bond. This number is not a universal estimate; it is included to show the approximation can be measured rather than ignored.
 
 The fitted/par-yield proxy price is found by treating coupon rates as par-yield-style curve points for coupon bonds and converting bills into discount-implied rates. The bootstrapped price is found by solving discount factors from dirty prices in maturity order and then discounting the same toy bond cash flows from the resulting zero curve.
 

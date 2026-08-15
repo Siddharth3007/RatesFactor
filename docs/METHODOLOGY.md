@@ -10,13 +10,13 @@ The app pulls U.S. Treasury constant-maturity yield series from FRED across 11 t
 1M, 3M, 6M, 1Y, 2Y, 3Y, 5Y, 7Y, 10Y, 20Y, 30Y
 ```
 
-Daily yield changes are computed in basis points and used for PCA, scenario generation, historical simulation VaR, and hedge backtesting.
+The FRED CMT/par-yield history is then converted into proxy periodic zero-rate history before downstream pricing, PCA, scenario generation, historical simulation VaR, and hedge backtesting.
 
 ## 2. Pricing Curve Source and Curve Construction
 
 RatesFactor supports three pricing-curve modes:
 
-- FRED fitted Treasury curve: the default mode, using Treasury constant-maturity rates pulled from FRED.
+- FRED CMT-implied zero curve: the default mode, converting Treasury constant-maturity/par-yield history from FRED into proxy periodic zero rates.
 - Filled demo bootstrap template: a demo curve construction universe with realistic dummy prices, useful for showing the bootstrapping workflow.
 - Uploaded curve construction universe: the user downloads the template, fills in instrument prices and terms, and uploads it back into the app.
 
@@ -28,9 +28,11 @@ coupon_rate, coupon_frequency, day_count, face_value,
 clean_price, accrued_interest, dirty_price, quote_date, notes
 ```
 
-For the bootstrapped modes, dirty price is used as the market PV. Bills are converted directly into discount factors. Coupon notes/bonds are bootstrapped in maturity order by discounting already-known earlier coupons and solving for the maturity discount factor. Between known points, discount factors are interpolated in log discount-factor space.
+For the FRED default mode, each tenor is treated as a par instrument priced at 100. Tenors shorter than or equal to the coupon period are treated as deposit-style zero-coupon points. Coupon tenors are bootstrapped in maturity order by discounting already-known earlier coupons and solving for the maturity discount factor. Between known points, discount factors are interpolated in log discount-factor space. The resulting discount factors are converted back into periodic zero rates using the same compounding convention as the bond-pricing engine.
 
-This is intentionally a demo-grade bootstrapper. FRED history is still used for PCA, historical shocks, VaR, and backtesting; the bootstrapped curve is used as the latest pricing curve.
+For the uploaded/demo curve-universe modes, dirty price is used as the market PV. Bills are converted directly into discount factors. Coupon notes/bonds are bootstrapped in maturity order by discounting already-known earlier coupons and solving for the maturity discount factor.
+
+This is intentionally a research-grade bootstrapper. The default FRED path is still a public-data proxy, not a CUSIP-level market Treasury curve. The uploaded/demo curve-universe modes override the latest pricing curve only; the FRED-implied zero-rate history remains the source for PCA, historical shocks, VaR, and backtesting.
 
 ## 3. Portfolio Normalization
 
@@ -66,7 +68,7 @@ DF(t) = 1 / (1 + r / frequency)^(frequency * t)
 
 For bootstrapped curve modes, the bootstrap solves discount factors directly from dirty prices. Those discount factors are used for pricing; any zero-rate view derived from them is a display convention.
 
-Current limitation: the FRED mode discounts from fitted Treasury curve rates rather than instrument-level market quotes. The bootstrapped modes demonstrate zero-curve construction, but the app remains a research-grade risk prototype rather than an institutional pricing system.
+Current limitation: the FRED mode bootstraps from CMT/par-yield proxies rather than instrument-level market quotes. The bootstrapped modes demonstrate zero-curve construction, but the app remains a research-grade risk prototype rather than an institutional pricing system.
 
 ## 5. DV01 and Key-Rate DV01
 

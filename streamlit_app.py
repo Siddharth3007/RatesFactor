@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from ratesfactor.attribution import pca_pnl_attribution
+from ratesfactor.bootstrapper import bootstrap_zero_from_par
 from ratesfactor.config import PRESET_SCENARIOS_BP, TREASURY_SERIES
 from ratesfactor.curves import compute_fwd, count_turning_points, cubic_spline_yield, fit_nss_grid, nss_yield
 from ratesfactor.data import RatesData, fetch_treasury_rates
@@ -388,7 +389,7 @@ with st.sidebar:
             "Pricing curve source",
             ["fred", "demo_bootstrap", "uploaded_bootstrap"],
             format_func=lambda x: {
-                "fred": "FRED fitted Treasury curve",
+                "fred": "FRED CMT-implied zero curve",
                 "demo_bootstrap": "Use filled demo bootstrap template",
                 "uploaded_bootstrap": "Upload curve construction universe",
             }[x],
@@ -397,8 +398,9 @@ with st.sidebar:
         if curve_source == "uploaded_bootstrap":
             curve_universe_file = st.file_uploader("Upload curve construction universe .xlsx", type=["xlsx"])
         st.caption(
-            "Bootstrapped curve modes use dirty prices from the curve construction universe for the latest pricing curve; "
-            "FRED history is still used for PCA, historical shocks, and backtests."
+            "FRED mode converts CMT/par-yield history into proxy periodic zero rates before pricing, PCA, shocks, "
+            "and backtests. Uploaded/demo bootstrap modes override the latest pricing curve using dirty prices "
+            "from the curve construction universe."
         )
 
     with st.expander("Download input templates"):
@@ -459,13 +461,14 @@ if run:
             day_count=day_count,
         )
         rates_pct = cached_fetch_rates(api_key, start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
-        rates_data = RatesData(rates_pct)
+        zero_rates_pct = bootstrap_zero_from_par(rates_pct, frequency=2, dc_conv=day_count)
+        rates_data = RatesData(zero_rates_pct)
 
     curve_as_of_date = pd.Timestamp(rates_data.latest_date)
     base_curve = rates_data.get_curve(curve_as_of_date, units="decimal")
     zero_curve = None
     curve_universe = None
-    pricing_curve_label = "FRED fitted Treasury curve"
+    pricing_curve_label = "FRED CMT-implied zero curve"
 
     with st.spinner("Preparing pricing curve..."):
         if curve_source == "demo_bootstrap":
@@ -638,9 +641,10 @@ with tabs[0]:
     metric_with_help(c2, "Weighted avg coupon", f"{portfolio_stats['weighted_avg_coupon']:.2%}")
     metric_with_help(c3, "Market / dirty value", format_money(portfolio_values["dirty_value"]))
     st.caption(
-        "Pricing caveat: FRED mode discounts off fitted CMT yields, not a fully bootstrapped market zero curve. "
-        "Bootstrapped modes are available as a demo/user-uploaded curve-construction workflow. A fitted/par-yield proxy "
-        "vs bootstrapped curve comparison is documented on GitHub in the README and Assumptions & Limitations."
+        "Pricing caveat: FRED mode uses CMT/par-yield-implied proxy zero rates, not a CUSIP-level market Treasury "
+        "zero curve. Demo/user-uploaded bootstrapped modes are available for curve-construction workflows. A "
+        "par-yield proxy vs bootstrapped curve comparison is documented on GitHub in the README and Assumptions "
+        "& Limitations."
     )
     st.dataframe(
         line_item_display_table(line_item_df),

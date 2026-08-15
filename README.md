@@ -8,7 +8,7 @@ It is a research-grade fixed-income risk analytics dashboard, not a production p
 
 ## Highlights
 
-- Treasury curve ingestion from FRED constant-maturity Treasury series across 11 tenors.
+- Treasury curve ingestion from FRED constant-maturity Treasury series across 11 tenors, with CMT/par-yield history converted into proxy zero-rate history before downstream risk analytics.
 - Pricing curve source can be FRED, a bundled demo curve-construction universe, or a user-uploaded curve-construction universe.
 - Portfolio ingestion from a toy portfolio, a standard holdings template, or iShares TLT-style holdings files.
 - Settlement-date-aware fixed-rate bond valuation with clean value, dirty value, accrued interest, ACT/ACT support, frequency, and maturity dates.
@@ -73,6 +73,7 @@ RatesFactor/
 │       └── prototype-notebooks/
 └── ratesfactor/
     ├── attribution.py
+    ├── bootstrapper.py
     ├── config.py
     ├── curves.py
     ├── data.py
@@ -102,7 +103,7 @@ Custom hedge instruments can also be uploaded through a hedge-instruments templa
 
 The app supports three pricing-curve modes:
 
-- **FRED fitted Treasury curve**: default mode using Treasury constant-maturity rates.
+- **FRED CMT-implied zero curve**: default mode that converts FRED constant-maturity/par-yield history into proxy periodic zero rates.
 - **Filled demo bootstrap template**: bundled dummy curve-construction universe for showing the bootstrapping workflow.
 - **Uploaded curve construction universe**: user downloads the template, fills in prices/terms, and uploads it back into the app.
 
@@ -119,13 +120,13 @@ RatesFactor focuses on Treasury curve risk:
 - Scenario shocks and VaR/ES.
 - Transaction-cost-aware backtesting.
 
-The pricing engine is intentionally simplified compared with institutional systems. FRED mode prices from fitted Treasury curve rates; the bootstrapped modes demonstrate curve construction from a template universe but are still research-grade, not a full production Treasury curve build. When rates are used directly for bond cash-flow discounting, the app uses periodic compounding based on the instrument coupon frequency:
+The pricing engine is intentionally simplified compared with institutional systems. FRED mode converts CMT/par-yield history into proxy periodic zero rates before pricing and risk; the bootstrapped modes demonstrate curve construction from a template universe but are still research-grade, not a full production Treasury curve build. When rates are used directly for bond cash-flow discounting, the app uses periodic compounding based on the instrument coupon frequency:
 
 ```text
 DF(t) = 1 / (1 + r / frequency)^(frequency * t)
 ```
 
-In the bundled demo curve-construction universe, comparing fitted/par-yield proxy pricing with the bootstrapped curve gives an average absolute difference of about **$2.07 per $100 face** across the toy 2Y/5Y/10Y/30Y bonds, with the largest difference about **$5.60 per $100 face** on the 30Y bond. This is a demo-universe sensitivity check, not a universal pricing-error estimate.
+In the bundled demo curve-construction universe, comparing fitted/par-yield proxy pricing with the bootstrapped curve gives an average absolute difference of about **$2.48 per $100 face** across the toy 2Y/5Y/10Y/30Y bonds, with the largest difference about **$6.54 per $100 face** on the 30Y bond. This is a demo-universe sensitivity check, not a universal pricing-error estimate.
 
 How that comparison is constructed:
 

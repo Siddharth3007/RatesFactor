@@ -41,5 +41,7 @@ Included notebooks:
 - [spline-forward-rate-diagnostics.ipynb](proof-of-work/prototype-notebooks/spline-forward-rate-diagnostics.ipynb): diagnostics around spline curve fitting and forward-rate behavior.
 - [bootstrap.ipynb](proof-of-work/prototype-notebooks/bootstrap.ipynb): exploratory zero-curve bootstrap prototype using a curve construction universe, dirty prices, coupon cashflows, year fractions, and log discount-factor interpolation.
 - [hedge-validation.ipynb](proof-of-work/prototype-notebooks/hedge-validation.ipynb): hedge validation notebook used to test PCA hedge behavior, rolling hedge weights, and backtest diagnostics before dashboard integration.
+- [bootstrap-from-fred.ipynb](proof-of-work/prototype-notebooks/bootstrap-from-fred.ipynb): prototype for converting FRED CMT/par-yield history into proxy zero-rate history using deposit-style short tenors, par-bond bootstrapping, year fractions, and log discount-factor interpolation.
+- [treasury-curve-toy-clean-bootstrap-stride.ipynb](proof-of-work/prototype-notebooks/treasury-curve-toy-clean-bootstrap-stride.ipynb): modified clean notebook that combines the FRED par-yield bootstrapper with stride-based rolling PCA hedge rebalancing before these ideas were brought into the app codebase.
 
 Note: these notebooks are not the maintained implementation. They are included to show the project development path and may contain exploratory code, intermediate outputs, and older assumptions. Secrets and local file paths have been replaced with placeholders.

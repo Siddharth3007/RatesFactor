@@ -1,5 +1,7 @@
 import pandas as pd
+import pytest
 
+from ratesfactor.bootstrapper import bootstrap_zero_from_par
 from ratesfactor.data import RatesData
 from ratesfactor.portfolio import toy_portfolio
 from ratesfactor.pricing import bond_value, value_bond_row
@@ -61,3 +63,23 @@ def test_demo_pricing_error_summary_is_bounded_and_nonempty():
     assert len(summary["comparison_table"]) == 4
     assert summary["max_abs_price_delta"] > 0
     assert summary["avg_abs_price_delta"] > 0
+
+
+def test_fred_par_bootstrap_returns_zero_rate_history():
+    dates = pd.to_datetime(["2026-01-01", "2026-01-02"])
+    par_yields = pd.DataFrame(
+        [
+            [4.00, 4.05, 4.10, 4.20, 4.35],
+            [4.01, 4.06, 4.11, 4.21, 4.36],
+        ],
+        index=dates,
+        columns=[1 / 12, 0.25, 0.5, 1.0, 2.0],
+    )
+
+    zero_rates = bootstrap_zero_from_par(par_yields, frequency=2, dc_conv="ACT/ACT")
+
+    assert list(zero_rates.columns) == list(par_yields.columns)
+    assert zero_rates.shape == par_yields.shape
+    assert zero_rates.notna().all().all()
+    assert zero_rates.iloc[0, 0] == pytest.approx(par_yields.iloc[0, 0])
+    assert zero_rates.iloc[0, 1] == pytest.approx(par_yields.iloc[0, 1])

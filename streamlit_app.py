@@ -111,8 +111,15 @@ def cached_template_download(template_name):
     )
 
 
+def demo_run_fingerprint():
+    if not DEMO_RUN_PATH.exists():
+        return None
+    stat = DEMO_RUN_PATH.stat()
+    return f"{stat.st_mtime_ns}-{stat.st_size}"
+
+
 @st.cache_data(show_spinner=False)
-def cached_load_demo_run():
+def cached_load_demo_run(file_fingerprint):
     with DEMO_RUN_PATH.open("rb") as handle:
         return pickle.load(handle)
 
@@ -460,16 +467,19 @@ run = st.sidebar.button(
     disabled=False if use_fast_demo else custom_run_disabled,
 )
 
+demo_fingerprint = demo_run_fingerprint()
 if use_fast_demo and (
     run
     or "run_state" not in st.session_state
     or st.session_state.get("active_run_mode") != "fast_demo"
+    or st.session_state.get("demo_run_fingerprint") != demo_fingerprint
 ):
     if not DEMO_RUN_PATH.exists():
         st.error("The precomputed fast demo file is missing. Switch to Custom run to recompute from inputs.")
         st.stop()
-    st.session_state.run_state = cached_load_demo_run()
+    st.session_state.run_state = cached_load_demo_run(demo_fingerprint)
     st.session_state.active_run_mode = "fast_demo"
+    st.session_state.demo_run_fingerprint = demo_fingerprint
 
 if "run_state" in st.session_state and not run:
     if st.session_state.get("active_run_mode") == "fast_demo":

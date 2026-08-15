@@ -23,7 +23,7 @@ def standard_holdings_template():
         "Maturity": ["2030-05-15", "2035-08-15"],
         "Coupon (%)": [3.50, 4.25],
         "Frequency": [2, 2],
-        "Settlement Date": ["2026-07-12", "2026-07-12"],
+        "Settlement Date": ["2026-08-15", "2026-08-15"],
         "Day Count": ["ACT/ACT", "ACT/ACT"],
     })
 
@@ -36,7 +36,7 @@ def tlt_holdings_template():
         "Par Value": [2_000_000, 1_500_000],
         "Maturity": ["2053-08-15", "2054-11-15"],
         "Coupon (%)": [4.13, 4.75],
-        "Settlement Date": ["2026-07-12", "2026-07-12"],
+        "Settlement Date": ["2026-08-15", "2026-08-15"],
         "Day Count": ["ACT/ACT", "ACT/ACT"],
     })
 
@@ -49,7 +49,7 @@ def hedge_instruments_template():
         "Coupon (%)": [0.00, 4.00],
         "Frequency": [1, 2],
         "Cost (bps)": [0.20, 0.25],
-        "Settlement Date": ["2026-07-12", "2026-07-12"],
+        "Settlement Date": ["2026-08-15", "2026-08-15"],
         "Day Count": ["ACT/ACT", "ACT/ACT"],
     })
 

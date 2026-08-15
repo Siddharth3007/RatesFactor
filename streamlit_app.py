@@ -352,7 +352,7 @@ with st.sidebar:
     elif source_type == "tlt":
         uploaded_file = st.file_uploader("Upload iShares TLT holdings .csv", type=["csv"])
 
-    holdings_as_of_date = st.date_input("Holdings / risk as-of date", value=date(2026, 7, 12))
+    holdings_as_of_date = st.date_input("Holdings / risk as-of date", value=date(2026, 8, 15))
     target_notional = st.number_input("Target portfolio notional", min_value=100_000, value=10_000_000, step=100_000)
 
     hedge_universe_name = st.selectbox(

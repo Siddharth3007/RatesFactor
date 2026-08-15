@@ -46,7 +46,7 @@ def load_fred_api_key():
 def build_demo_state():
     api_key = load_fred_api_key()
 
-    holdings_as_of_ts = pd.Timestamp("2026-07-12")
+    holdings_as_of_ts = pd.Timestamp("2026-08-15")
     history_years = 5
     day_count = "ACT/ACT"
     lookback = 252

@@ -132,8 +132,8 @@ METRIC_HELP = {
     "Weighted avg coupon": "Face-value-weighted average coupon across the active portfolio.",
     "Market / dirty value": "Present value including accrued interest, using the selected pricing curve source.",
     "DV01": "Dollar change in portfolio value for a 1 bp parallel move in rates.",
-    "Effective duration": "Approximate percentage price sensitivity to a small parallel yield-curve shift.",
-    "Convexity": "Second-order sensitivity of portfolio value to rate moves.",
+    "Effective duration": "Approximate percentage price sensitivity to a small parallel yield-curve shift. It is value-normalized.",
+    "Convexity": "Second-order sensitivity of portfolio value to rate moves. It is value-normalized.",
     "Largest KRD bucket": "Treasury tenor where the portfolio has the largest absolute key-rate DV01.",
     "Largest KRD share": "Largest absolute key-rate DV01 divided by total absolute key-rate DV01.",
     "Suitability": "Default warning based on hedge-universe coverage. The threshold is a practical 1.5x heuristic, not a theoretical boundary.",
@@ -843,15 +843,23 @@ with tabs[2]:
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Unhedged value", format_money(unhedged_value))
-    c2.metric("Hedged value", format_money(hedged_value))
+    c2.metric("Combined hedged-book value", format_money(hedged_value))
     metric_with_help(c3, "Unhedged parallel DV01", format_money(unhedged_dv01), key="DV01")
-    metric_with_help(c4, "Hedged parallel DV01", format_money(hedged_dv01), key="DV01")
+    metric_with_help(c4, "Combined hedged-book parallel DV01", format_money(hedged_dv01), key="DV01")
 
     c1, c2, c3, c4 = st.columns(4)
     metric_with_help(c1, "Unhedged eff. duration", f"{unhedged_duration:.2f}", key="Effective duration")
-    metric_with_help(c2, "Hedged eff. duration", f"{hedged_duration:.2f}", key="Effective duration")
+    metric_with_help(c2, "Combined hedged-book eff. duration", f"{hedged_duration:.2f}", key="Effective duration")
     metric_with_help(c3, "Unhedged convexity", f"{unhedged_convexity:.2f}", key="Convexity")
-    metric_with_help(c4, "Hedged convexity", f"{hedged_convexity:.2f}", key="Convexity")
+    metric_with_help(c4, "Combined hedged-book convexity", f"{hedged_convexity:.2f}", key="Convexity")
+    st.caption(
+        "Effective duration is value-normalized, so combined hedged-book duration can rise when hedge positions "
+        "reduce combined book value. Dollar DV01/KRD residuals are more relevant for hedge evaluation."
+    )
+    st.caption(
+        "Convexity is value-normalized, so it can rise when hedge positions reduce combined book value. "
+        "Dollar second-order P&L is more relevant for hedge evaluation."
+    )
 
     unhedged_ladder = make_delta_ladder(portfolio, rates_data, curve_as_of_date)
     hedged_ladder = make_delta_ladder(hedged_portfolio, rates_data, curve_as_of_date)

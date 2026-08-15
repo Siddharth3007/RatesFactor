@@ -55,6 +55,12 @@ export FRED_API_KEY="your_key_here"
 
 Do not commit `.streamlit/secrets.toml`.
 
+The hosted dashboard opens in **Fast demo** mode by default. That mode loads a precomputed default toy-portfolio run from `assets/demo_run.pkl`, so reviewers can see the full dashboard without waiting for the rolling hedge backtest and VaR tables to recompute. Switch to **Custom run** in the sidebar to run the full pipeline from selected inputs. To refresh the bundled demo artifact locally:
+
+```bash
+python scripts/build_demo_run.py
+```
+
 ## Project Structure
 
 ```text
@@ -71,6 +77,8 @@ RatesFactor/
 │   └── proof-of-work/
 │       ├── pca-hedge-derivation.pdf
 │       └── prototype-notebooks/
+├── scripts/
+│   └── build_demo_run.py
 └── ratesfactor/
     ├── attribution.py
     ├── bootstrapper.py

@@ -1,6 +1,8 @@
 import inspect
 import os
+import pickle
 from datetime import date
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -51,6 +53,9 @@ from ratesfactor.zerocurve import bootstrap_zero_curve, load_curve_universe, zer
 
 
 st.set_page_config(page_title="RatesFactor", layout="wide")
+
+
+DEMO_RUN_PATH = Path(__file__).resolve().parent / "assets" / "demo_run.pkl"
 
 
 @st.cache_data(show_spinner=False)
@@ -104,6 +109,12 @@ def cached_template_download(template_name):
         "ratesfactor_curve_construction_universe_template.xlsx",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
+
+@st.cache_data(show_spinner=False)
+def cached_load_demo_run():
+    with DEMO_RUN_PATH.open("rb") as handle:
+        return pickle.load(handle)
 
 
 def format_money(x):
@@ -308,6 +319,19 @@ st.caption("Treasury curve risk, PCA hedging, scenarios, VaR, and attribution")
 with st.sidebar:
     st.header("Inputs")
 
+    run_mode = st.radio(
+        "Run mode",
+        ["Fast demo", "Custom run"],
+        index=0,
+        help="Fast demo loads a precomputed default run. Custom run recomputes from the selected inputs.",
+    )
+    use_fast_demo = run_mode == "Fast demo"
+    if use_fast_demo:
+        st.caption(
+            "Fast demo uses the default toy portfolio, middle-end hedge universe, 750-day hedge backtest, "
+            "10-day rebalance stride, and 300-day VaR backtest. Switch to Custom run to recompute."
+        )
+
     api_key = get_fred_api_key()
     if api_key:
         st.caption("FRED API key loaded from local secrets/config.")
@@ -424,15 +448,34 @@ with st.sidebar:
                 mime=template_mime,
             )
 
-run_disabled = (
+custom_run_disabled = (
     (not api_key)
     or (source_type != "toy" and uploaded_file is None)
     or (hedge_universe_name == "Custom hedge template" and hedge_file is None)
     or (curve_source == "uploaded_bootstrap" and curve_universe_file is None)
 )
-run = st.sidebar.button("Run RatesFactor", type="primary", disabled=run_disabled)
+run = st.sidebar.button(
+    "Load Fast Demo" if use_fast_demo else "Run RatesFactor",
+    type="primary",
+    disabled=False if use_fast_demo else custom_run_disabled,
+)
+
+if use_fast_demo and (
+    run
+    or "run_state" not in st.session_state
+    or st.session_state.get("active_run_mode") != "fast_demo"
+):
+    if not DEMO_RUN_PATH.exists():
+        st.error("The precomputed fast demo file is missing. Switch to Custom run to recompute from inputs.")
+        st.stop()
+    st.session_state.run_state = cached_load_demo_run()
+    st.session_state.active_run_mode = "fast_demo"
+
 if "run_state" in st.session_state and not run:
-    st.sidebar.caption("Showing the last completed run. Click Run RatesFactor to refresh after changing inputs.")
+    if st.session_state.get("active_run_mode") == "fast_demo":
+        st.sidebar.caption("Showing the precomputed fast demo. Switch to Custom run to recompute from inputs.")
+    else:
+        st.sidebar.caption("Showing the last completed run. Click Run RatesFactor to refresh after changing inputs.")
 
 if (not run) and ("run_state" not in st.session_state):
     st.info("Choose inputs in the sidebar and click Run RatesFactor.")
@@ -447,7 +490,7 @@ if (not run) and ("run_state" not in st.session_state):
     st.stop()
 
 
-if run:
+if run and not use_fast_demo:
     holdings_as_of_ts = pd.Timestamp(holdings_as_of_date)
     start_date = holdings_as_of_ts - pd.DateOffset(years=history_years)
     end_date = holdings_as_of_ts
@@ -576,6 +619,7 @@ if run:
         "max_backtest_days": int(max_backtest_days),
         "curve_fit_method": curve_fit_method,
     }
+    st.session_state.active_run_mode = "custom"
 
 state = st.session_state.run_state
 portfolio = state["portfolio"]
@@ -614,6 +658,8 @@ st.caption(
     f"Rolling PCA hedge backtest observations: latest {int(max_backtest_days)} days; "
     "PCA hedge weights are rebalanced after a fixed number of days set by the rebalance stride."
 )
+if st.session_state.get("active_run_mode") == "fast_demo":
+    st.caption("Fast demo mode: results are loaded from a precomputed default run so the hosted app opens quickly.")
 
 if hedge_diag["severity"] == "Warning":
     st.warning(
@@ -939,28 +985,37 @@ with tabs[5]:
         "moves. A reasonable VaR backtest should have breach frequency close to the selected tail rate; a low Kupiec "
         "p-value suggests the breach rate is inconsistent with the target VaR level."
     )
-    hist_var = compute_historical_var(
-        portfolio,
-        hedge_instruments,
-        hedge_weights,
-        rates_data,
-        alpha=alpha,
-        lookback=int(lookback),
-    )
-    param_var = compute_parametric_var(
-        portfolio,
-        hedge_instruments,
-        hedge_weights,
-        rates_data,
-        latest_pca,
-        alpha=alpha,
-        lookback=int(lookback),
-        n_components=n_components,
-    )
+    if "hist_var" in state:
+        hist_var = state["hist_var"]
+    else:
+        hist_var = compute_historical_var(
+            portfolio,
+            hedge_instruments,
+            hedge_weights,
+            rates_data,
+            alpha=alpha,
+            lookback=int(lookback),
+        )
+    if "param_var" in state:
+        param_var = state["param_var"]
+    else:
+        param_var = compute_parametric_var(
+            portfolio,
+            hedge_instruments,
+            hedge_weights,
+            rates_data,
+            latest_pca,
+            alpha=alpha,
+            lookback=int(lookback),
+            n_components=n_components,
+        )
     st.write("Historical simulation VaR / ES")
     st.dataframe(formatted_var_table(hist_var), use_container_width=True, hide_index=True)
     st.write("Historical VaR Backtest")
-    var_backtest = backtest_historical_var_table(results_df, alpha=alpha, lookback=int(var_backtest_lookback))
+    if "var_backtest" in state:
+        var_backtest = state["var_backtest"]
+    else:
+        var_backtest = backtest_historical_var_table(results_df, alpha=alpha, lookback=int(var_backtest_lookback))
     if var_backtest.empty or var_backtest["days"].sum() == 0:
         st.info("Not enough backtest observations after the selected VaR backtest lookback window.")
     else:

@@ -55,7 +55,26 @@ from ratesfactor.zerocurve import bootstrap_zero_curve, load_curve_universe, zer
 st.set_page_config(page_title="RatesFactor", layout="wide")
 
 
-DEMO_RUN_PATH = Path(__file__).resolve().parent / "assets" / "demo_run.pkl"
+ASSETS_DIR = Path(__file__).resolve().parent / "assets"
+DEMO_RUNS = {
+    "toy": {
+        "label": "Demo 1: Toy Treasury book",
+        "path": ASSETS_DIR / "demo_run.pkl",
+        "description": (
+            "Default toy Treasury portfolio, middle-end 3Y/7Y/20Y hedge universe, "
+            "750-day hedge backtest, fixed rebalance stride, and 300-day VaR backtest."
+        ),
+    },
+    "ief": {
+        "label": "Demo 2: IEF holdings + custom hedge universe",
+        "path": ASSETS_DIR / "demo_run_ief.pkl",
+        "description": (
+            "IEF-style Treasury holdings with a custom 5Y/7Y/10Y/20Y hedge universe, "
+            "holdings/risk as-of 2026-08-19, 750-day hedge backtest, fixed rebalance stride, "
+            "and 300-day VaR backtest."
+        ),
+    },
+}
 
 
 @st.cache_data(show_spinner=False)
@@ -111,16 +130,17 @@ def cached_template_download(template_name):
     )
 
 
-def demo_run_fingerprint():
-    if not DEMO_RUN_PATH.exists():
+def demo_run_fingerprint(demo_key):
+    demo_path = DEMO_RUNS[demo_key]["path"]
+    if not demo_path.exists():
         return None
-    stat = DEMO_RUN_PATH.stat()
+    stat = demo_path.stat()
     return f"{stat.st_mtime_ns}-{stat.st_size}"
 
 
 @st.cache_data(show_spinner=False)
-def cached_load_demo_run(file_fingerprint):
-    with DEMO_RUN_PATH.open("rb") as handle:
+def cached_load_demo_run(demo_key, file_fingerprint):
+    with DEMO_RUNS[demo_key]["path"].open("rb") as handle:
         return pickle.load(handle)
 
 
@@ -337,11 +357,17 @@ with st.sidebar:
     if not use_fast_demo and st.session_state.get("active_run_mode") == "fast_demo":
         st.session_state.pop("run_state", None)
         st.session_state.active_run_mode = "custom_pending"
+        st.session_state.pop("active_demo_key", None)
+    selected_demo_key = "toy"
     if use_fast_demo:
-        st.caption(
-            "Fast demo uses the default toy portfolio, middle-end hedge universe, 750-day hedge backtest, "
-            "10-day rebalance stride, and 300-day VaR backtest. Switch to Custom run to recompute."
+        selected_demo_key = st.selectbox(
+            "Fast demo case",
+            list(DEMO_RUNS.keys()),
+            format_func=lambda demo_key: DEMO_RUNS[demo_key]["label"],
+            key="fast_demo_case",
         )
+        st.caption(DEMO_RUNS[selected_demo_key]["description"])
+        st.caption("Switch to Custom run to recompute from inputs.")
 
     api_key = get_fred_api_key()
     if api_key:
@@ -494,18 +520,24 @@ run = st.sidebar.button(
     disabled=False if use_fast_demo else custom_run_disabled,
 )
 
-demo_fingerprint = demo_run_fingerprint()
+demo_fingerprint = demo_run_fingerprint(selected_demo_key)
 if use_fast_demo and (
     run
     or "run_state" not in st.session_state
     or st.session_state.get("active_run_mode") != "fast_demo"
+    or st.session_state.get("active_demo_key") != selected_demo_key
     or st.session_state.get("demo_run_fingerprint") != demo_fingerprint
 ):
-    if not DEMO_RUN_PATH.exists():
-        st.error("The precomputed fast demo file is missing. Switch to Custom run to recompute from inputs.")
+    if demo_fingerprint is None:
+        st.error(f"The precomputed file for {DEMO_RUNS[selected_demo_key]['label']} is missing. Switch to Custom run to recompute from inputs.")
         st.stop()
-    st.session_state.run_state = cached_load_demo_run(demo_fingerprint)
+    demo_state = cached_load_demo_run(selected_demo_key, demo_fingerprint)
+    demo_state["demo_key"] = selected_demo_key
+    demo_state["demo_label"] = DEMO_RUNS[selected_demo_key]["label"]
+    demo_state["demo_description"] = DEMO_RUNS[selected_demo_key]["description"]
+    st.session_state.run_state = demo_state
     st.session_state.active_run_mode = "fast_demo"
+    st.session_state.active_demo_key = selected_demo_key
     st.session_state.demo_run_fingerprint = demo_fingerprint
 
 if (
@@ -524,7 +556,8 @@ if (
 
 if "run_state" in st.session_state and not run:
     if st.session_state.get("active_run_mode") == "fast_demo":
-        st.sidebar.caption("Showing the precomputed fast demo.")
+        active_demo_key = st.session_state.get("active_demo_key", "toy")
+        st.sidebar.caption(f"Showing {DEMO_RUNS.get(active_demo_key, DEMO_RUNS['toy'])['label']}.")
     else:
         st.sidebar.caption("Showing the last completed run. Click Run RatesFactor to refresh after changing inputs.")
 
@@ -710,7 +743,9 @@ st.caption(
     "PCA hedge weights are rebalanced after a fixed number of days set by the rebalance stride."
 )
 if st.session_state.get("active_run_mode") == "fast_demo":
-    st.caption("Fast demo mode: results are loaded from a precomputed default run so the hosted app opens quickly.")
+    demo_label = state.get("demo_label", "Fast demo")
+    demo_description = state.get("demo_description", "results are loaded from a precomputed run so the hosted app opens quickly.")
+    st.caption(f"{demo_label}: {demo_description} Results are loaded from a precomputed run so the hosted app opens quickly.")
 
 if hedge_diag["severity"] == "Warning":
     st.warning(

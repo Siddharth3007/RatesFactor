@@ -481,9 +481,23 @@ if use_fast_demo and (
     st.session_state.active_run_mode = "fast_demo"
     st.session_state.demo_run_fingerprint = demo_fingerprint
 
+if (
+    not use_fast_demo
+    and not run
+    and st.session_state.get("active_run_mode") == "fast_demo"
+):
+    st.info("Custom run selected. Upload the required files and click Run RatesFactor to compute these inputs.")
+    if source_type != "toy" and uploaded_file is None:
+        st.warning("Upload a holdings file or select the toy portfolio.")
+    if hedge_universe_name == "Custom hedge template" and hedge_file is None:
+        st.warning("Upload a custom hedge instruments file or choose a built-in hedge universe.")
+    if curve_source == "uploaded_bootstrap" and curve_universe_file is None:
+        st.warning("Upload a curve construction universe file or choose the FRED/demo curve option.")
+    st.stop()
+
 if "run_state" in st.session_state and not run:
     if st.session_state.get("active_run_mode") == "fast_demo":
-        st.sidebar.caption("Showing the precomputed fast demo. Switch to Custom run to recompute from inputs.")
+        st.sidebar.caption("Showing the precomputed fast demo.")
     else:
         st.sidebar.caption("Showing the last completed run. Click Run RatesFactor to refresh after changing inputs.")
 

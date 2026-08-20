@@ -1,11 +1,13 @@
 import numpy as np
 import pandas as pd
 from scipy.interpolate import CubicSpline
+from functools import lru_cache
 
 
-def year_fraction(start_date, end_date, day_count="ACT/ACT"):
-    start_date = pd.Timestamp(start_date)
-    end_date = pd.Timestamp(end_date)
+@lru_cache(maxsize=200_000)
+def _year_fraction_cached(start_value, end_value, day_count):
+    start_date = pd.Timestamp(start_value)
+    end_date = pd.Timestamp(end_value)
     days = (end_date - start_date).days
 
     if day_count == "ACT/ACT":
@@ -28,6 +30,12 @@ def year_fraction(start_date, end_date, day_count="ACT/ACT"):
     if day_count == "ACT/360":
         return days / 360
     raise ValueError("Day count convention must be ACT/ACT, ACT/365.25, ACT/365, or ACT/360")
+
+
+def year_fraction(start_date, end_date, day_count="ACT/ACT"):
+    start_date = pd.Timestamp(start_date)
+    end_date = pd.Timestamp(end_date)
+    return _year_fraction_cached(start_date.value, end_date.value, day_count)
 
 
 def _curve_interpolator(rate_curve):
@@ -111,7 +119,7 @@ def bond_pricer(face_value, coupon, maturity, rate_curve, spline, frequency):
     return bond_value(face_value, coupon, settlement_date, maturity_date, spline, frequency)["dirty_value"]
 
 
-def value_bond_row(row, rate_curve, settlement_date=None):
+def value_bond_row(row, rate_curve, settlement_date=None, curve_fn=None):
     if settlement_date is None:
         if "settlement_date" in row.index and pd.notna(row["settlement_date"]):
             settlement_date = row["settlement_date"]
@@ -121,7 +129,8 @@ def value_bond_row(row, rate_curve, settlement_date=None):
     settlement_date = pd.Timestamp(settlement_date)
     maturity_date = _infer_maturity_date(row, settlement_date)
     day_count = row.get("day_count", "ACT/ACT")
-    curve_fn = _curve_interpolator(rate_curve)
+    if curve_fn is None:
+        curve_fn = _curve_interpolator(rate_curve)
 
     values = bond_value(
         float(row["face_value"]),
@@ -137,9 +146,10 @@ def value_bond_row(row, rate_curve, settlement_date=None):
 
 
 def portfolio_valuation(portfolio, rate_curve, settlement_date=None):
+    curve_fn = _curve_interpolator(rate_curve)
     rows = []
     for _, row in portfolio.iterrows():
-        rows.append(value_bond_row(row, rate_curve, settlement_date=settlement_date))
+        rows.append(value_bond_row(row, rate_curve, settlement_date=settlement_date, curve_fn=curve_fn))
     if not rows:
         return {
             "dirty_value": 0.0,

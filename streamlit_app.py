@@ -330,9 +330,13 @@ with st.sidebar:
         "Run mode",
         ["Fast demo", "Custom run"],
         index=0,
+        key="run_mode",
         help="Fast demo loads a precomputed default run. Custom run recomputes from the selected inputs.",
     )
     use_fast_demo = run_mode == "Fast demo"
+    if not use_fast_demo and st.session_state.get("active_run_mode") == "fast_demo":
+        st.session_state.pop("run_state", None)
+        st.session_state.active_run_mode = "custom_pending"
     if use_fast_demo:
         st.caption(
             "Fast demo uses the default toy portfolio, middle-end hedge universe, 750-day hedge backtest, "
@@ -351,16 +355,25 @@ with st.sidebar:
             "standard": "Standard holdings template",
             "tlt": "iShares TLT holdings CSV",
         }[x],
+        key="portfolio_source",
     )
 
     uploaded_file = None
     if source_type == "standard":
-        uploaded_file = st.file_uploader("Upload standard holdings .xlsx", type=["xlsx"])
+        uploaded_file = st.file_uploader(
+            "Upload standard holdings .xlsx",
+            type=["xlsx"],
+            key="standard_holdings_upload",
+        )
     elif source_type == "tlt":
-        uploaded_file = st.file_uploader("Upload iShares TLT holdings .csv", type=["csv"])
+        uploaded_file = st.file_uploader(
+            "Upload iShares TLT holdings .csv",
+            type=["csv"],
+            key="tlt_holdings_upload",
+        )
 
-    holdings_as_of_date = st.date_input("Holdings / risk as-of date", value=date(2026, 8, 15))
-    target_notional = st.number_input("Target portfolio notional", min_value=100_000, value=10_000_000, step=100_000)
+    holdings_as_of_date = st.date_input("Holdings / risk as-of date", value=date(2026, 8, 15), key="holdings_as_of_date")
+    target_notional = st.number_input("Target portfolio notional", min_value=100_000, value=10_000_000, step=100_000, key="target_notional")
 
     hedge_universe_name = st.selectbox(
         "Hedge universe",
@@ -371,22 +384,28 @@ with st.sidebar:
             "Custom hedge template",
         ],
         index=1,
+        key="hedge_universe",
     )
     hedge_file = None
     if hedge_universe_name == "Custom hedge template":
-        hedge_file = st.file_uploader("Upload custom hedge instruments .xlsx", type=["xlsx"])
+        hedge_file = st.file_uploader(
+            "Upload custom hedge instruments .xlsx",
+            type=["xlsx"],
+            key="custom_hedge_upload",
+        )
 
     with st.expander("Advanced settings"):
-        day_count = st.selectbox("Day count convention", ["ACT/ACT", "ACT/365.25", "ACT/365", "ACT/360"])
-        history_years = st.number_input("Curve history window (years)", min_value=1, max_value=15, value=5, step=1)
-        alpha = st.selectbox("VaR significance level", [0.05, 0.01], format_func=lambda x: f"{x:.0%} tail / {(1-x):.0%} VaR")
-        lookback = st.number_input("PCA / VaR lookback days", min_value=60, max_value=1000, value=252, step=21)
+        day_count = st.selectbox("Day count convention", ["ACT/ACT", "ACT/365.25", "ACT/365", "ACT/360"], key="day_count")
+        history_years = st.number_input("Curve history window (years)", min_value=1, max_value=15, value=5, step=1, key="history_years")
+        alpha = st.selectbox("VaR significance level", [0.05, 0.01], format_func=lambda x: f"{x:.0%} tail / {(1-x):.0%} VaR", key="alpha")
+        lookback = st.number_input("PCA / VaR lookback days", min_value=60, max_value=1000, value=252, step=21, key="lookback_days")
         max_backtest_days = st.number_input(
             "Rolling hedge backtest days",
             min_value=30,
             max_value=1000,
             value=750,
             step=30,
+            key="max_backtest_days",
             help="Number of daily P&L observations replayed in the rolling hedge backtest.",
         )
         pca_stride = st.number_input(
@@ -395,6 +414,7 @@ with st.sidebar:
             max_value=60,
             value=10,
             step=1,
+            key="pca_stride",
             help="Recompute PCA hedge weights every N backtest days and hold the previous hedge between rebalances.",
         )
         var_backtest_lookback = st.number_input(
@@ -403,6 +423,7 @@ with st.sidebar:
             max_value=750,
             value=300,
             step=25,
+            key="var_backtest_lookback",
             help="Rolling P&L window used only for the Kupiec VaR breach test. Keep it below the hedge backtest days to show results.",
         )
         ridge_lambda = st.number_input(
@@ -412,10 +433,11 @@ with st.sidebar:
             value=0.10,
             step=0.001,
             format="%.6f",
+            key="ridge_lambda",
             help="Higher values reduce unstable hedge weights but allow more residual factor exposure.",
         )
         st.caption("Ridge λ trades off factor-neutrality against hedge stability: higher values shrink hedge weights but leave more residual exposure.")
-        curve_fit_method = st.selectbox("Displayed curve fit", ["NSS", "Cubic spline"])
+        curve_fit_method = st.selectbox("Displayed curve fit", ["NSS", "Cubic spline"], key="curve_fit_method")
         curve_source = st.selectbox(
             "Pricing curve source",
             ["fred", "demo_bootstrap", "uploaded_bootstrap"],
@@ -424,10 +446,15 @@ with st.sidebar:
                 "demo_bootstrap": "Use filled demo bootstrap template",
                 "uploaded_bootstrap": "Upload curve construction universe",
             }[x],
+            key="curve_source",
         )
         curve_universe_file = None
         if curve_source == "uploaded_bootstrap":
-            curve_universe_file = st.file_uploader("Upload curve construction universe .xlsx", type=["xlsx"])
+            curve_universe_file = st.file_uploader(
+                "Upload curve construction universe .xlsx",
+                type=["xlsx"],
+                key="curve_universe_upload",
+            )
         st.caption(
             "FRED mode converts CMT/par-yield history into proxy periodic zero rates before pricing, PCA, shocks, "
             "and backtests. Uploaded/demo bootstrap modes override the latest pricing curve using dirty prices "

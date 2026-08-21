@@ -55,7 +55,14 @@ export FRED_API_KEY="your_key_here"
 
 Do not commit `.streamlit/secrets.toml`.
 
-The hosted dashboard opens in **Fast demo** mode by default. That mode loads a precomputed default toy-portfolio run from `assets/demo_run.pkl`, so reviewers can see the full dashboard without waiting for the rolling hedge backtest and VaR tables to recompute. Switch to **Custom run** in the sidebar to run the full pipeline from selected inputs. To refresh the bundled demo artifact locally:
+The hosted dashboard opens in **Fast demo** mode by default. That mode loads precomputed runs, so reviewers can see the full dashboard without waiting for the rolling hedge backtest and VaR tables to recompute. Switch to **Custom run** in the sidebar to run the full pipeline from selected inputs.
+
+The bundled fast demos are:
+
+- **Demo 1: Toy Treasury book**: a 2Y/5Y/10Y/30Y Treasury portfolio with the middle-end 3Y/7Y/20Y hedge universe. This is the clean walkthrough case used to show the full workflow quickly.
+- **Demo 2: IEF-style holdings + custom hedge universe**: a validation/demo case using IEF-style Treasury holdings as-of **2026-08-19** with a custom 5Y/7Y/10Y/20Y hedge universe. In the cached run, the portfolio has 15 Treasury rows, 4 hedge instruments, 750 backtest observations, about **81.36%** average absolute P&L reduction, about **52.72%** net volatility reduction, and about **$11.1k** of modeled transaction costs. The latest available FRED curve used in that cached run is **2026-08-18**.
+
+To refresh the bundled demo artifacts locally:
 
 ```bash
 python scripts/build_demo_run.py
@@ -79,6 +86,12 @@ RatesFactor/
 │       └── prototype-notebooks/
 ├── scripts/
 │   └── build_demo_run.py
+├── assets/
+│   ├── demo_run.pkl
+│   └── demo_run_ief.pkl
+├── downloaded_holdings/
+│   ├── IEF_dashboard_standard_holdings_2026-08-19.xlsx
+│   └── IEF_hedge_universe_2026-08-19.xlsx
 └── ratesfactor/
     ├── attribution.py
     ├── bootstrapper.py
